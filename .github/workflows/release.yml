@@ -1,0 +1,27 @@
+name: Release
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  test:
+    uses: ./.github/workflows/test.yml
+
+  publish:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: true
+      - uses: actions/setup-python@v4
+        with:
+          python-version: "3.9"
+      - name: Publish
+        run: |
+          pip install poetry==1.7.0
+          pip install poetry-dynamic-versioning[plugin]
+          poetry dynamic-versioning
+          poetry build
+          poetry publish -u __token__ -p ${{ secrets.PYPI_API_TOKEN }}

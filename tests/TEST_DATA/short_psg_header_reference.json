@@ -1,0 +1,93 @@
+[
+    {
+        "label": "EEG Fpz-Cz",
+        "transducer_type": "Ag-AgCl electrodes",
+        "physical_dimension": "uV",
+        "physical_min": -192,
+        "physical_max": 192,
+        "digital_min": -2048,
+        "digital_max": 2047,
+        "prefiltering": "HP:0.5Hz LP:100Hz [enhanced cassette BW]",
+        "samples_per_data_record": 3000,
+        "reserved": "",
+        "sampling_frequency": 100.0
+    },
+    {
+        "label": "EEG Pz-Oz",
+        "transducer_type": "Ag-AgCl electrodes",
+        "physical_dimension": "uV",
+        "physical_min": -197,
+        "physical_max": 196,
+        "digital_min": -2048,
+        "digital_max": 2047,
+        "prefiltering": "HP:0.5Hz LP:100Hz [enhanced cassette BW]",
+        "samples_per_data_record": 3000,
+        "reserved": "",
+        "sampling_frequency": 100.0
+    },
+    {
+        "label": "EOG horizontal",
+        "transducer_type": "Ag-AgCl electrodes",
+        "physical_dimension": "uV",
+        "physical_min": -1009,
+        "physical_max": 1009,
+        "digital_min": -2048,
+        "digital_max": 2047,
+        "prefiltering": "HP:0.5Hz LP:100Hz [enhanced cassette BW]",
+        "samples_per_data_record": 3000,
+        "reserved": "",
+        "sampling_frequency": 100.0
+    },
+    {
+        "label": "Resp oro-nasal",
+        "transducer_type": "Oral-nasal thermistors",
+        "physical_dimension": "",
+        "physical_min": -2048,
+        "physical_max": 2047,
+        "digital_min": -2048,
+        "digital_max": 2047,
+        "prefiltering": "HP:0.03Hz LP:0.9Hz",
+        "samples_per_data_record": 30,
+        "reserved": "",
+        "sampling_frequency": 1.0
+    },
+    {
+        "label": "EMG submental",
+        "transducer_type": "Ag-AgCl electrodes",
+        "physical_dimension": "uV",
+        "physical_min": -5,
+        "physical_max": 5,
+        "digital_min": -2500,
+        "digital_max": 2500,
+        "prefiltering": "HP:16Hz Rectification LP:0.7Hz",
+        "samples_per_data_record": 30,
+        "reserved": "",
+        "sampling_frequency": 1.0
+    },
+    {
+        "label": "Temp rectal",
+        "transducer_type": "Rectal thermistor",
+        "physical_dimension": "DegC",
+        "physical_min": 34,
+        "physical_max": 40,
+        "digital_min": -2849,
+        "digital_max": 2731,
+        "prefiltering": "",
+        "samples_per_data_record": 30,
+        "reserved": "",
+        "sampling_frequency": 1.0
+    },
+    {
+        "label": "Event marker",
+        "transducer_type": "Marker button",
+        "physical_dimension": "",
+        "physical_min": -2047,
+        "physical_max": 2048,
+        "digital_min": -2047,
+        "digital_max": 2048,
+        "prefiltering": "Hold during 2 seconds",
+        "samples_per_data_record": 30,
+        "reserved": "",
+        "sampling_frequency": 1.0
+    }
+]

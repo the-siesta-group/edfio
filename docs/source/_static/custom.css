@@ -1,0 +1,14 @@
+html[data-theme="light"] {
+    --pst-color-primary: #08bdbd;
+    --pst-color-secondary: #a08be7;
+    --pst-color-target: #dddddd;
+    --pst-color-inline-code: #a08be7;
+    --pst-color-inline-code-links: #08bdbd;
+}
+html[data-theme="dark"] {
+    --pst-color-primary: #08bdbd;
+    --pst-color-secondary: #a08be7;
+    --pst-color-target: rgba(213, 215, 83, 0.3);
+    --pst-color-inline-code: #a08be7;
+    --pst-color-inline-code-links: #08bdbd;
+}

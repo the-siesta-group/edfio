@@ -1,0 +1,4 @@
+*__pycache__*
+build
+docs/source/generated
+poetry.lock
