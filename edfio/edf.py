@@ -35,6 +35,7 @@ from edfio._utils import (
     encode_annotation_onset,
     encode_edfplus_date,
     repr_from_init,
+    round_float_to_8_characters,
 )
 
 _ANNOTATIONS_PATTERN = re.compile(
@@ -299,14 +300,16 @@ class EdfSignal:
                 )
             data_min = data.min()
             data_max = data.max()
-            rounded_min = self._round_to_eight_digit_decimal(data_min)
-            rounded_max = self._round_to_eight_digit_decimal(data_max)
-            if rounded_min < physical_range.min or rounded_max > physical_range.max:
+            if data_min < physical_range.min or data_max > physical_range.max:
                 raise ValueError(
                     f"Signal range [{data_min}, {data_max}] out of physical range: [{physical_range.min}, {physical_range.max}]"
                 )
-        self._physical_min = EdfSignal.physical_min.encode(physical_range.min)
-        self._physical_max = EdfSignal.physical_max.encode(physical_range.max)
+        self._physical_min = EdfSignal.physical_min.encode(
+            round_float_to_8_characters(physical_range.min, math.floor)
+        )
+        self._physical_max = EdfSignal.physical_max.encode(
+            round_float_to_8_characters(physical_range.max, math.ceil)
+        )
 
     def _set_data(self, data: npt.NDArray[np.float64]) -> None:
         gain, offset = calculate_gain_and_offset(
@@ -315,13 +318,7 @@ class EdfSignal:
             self.physical_min,
             self.physical_max,
         )
-        self._digital = np.minimum(
-            np.maximum(np.round(data / gain - offset), -32768), 32767
-        ).astype(np.int16)
-
-    def _round_to_eight_digit_decimal(self, value: float) -> float:
-        formatted = f"{value:.6g}" if value < 0 else f"{value:.7g}"
-        return float(formatted)
+        self._digital = np.round(data / gain - offset).astype(np.int16)
 
 
 class Patient:

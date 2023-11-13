@@ -30,23 +30,6 @@ def test_encode_float(value: float, expected: bytes):
     assert encode_float(value, 8) == expected
 
 
-@pytest.mark.parametrize(
-    ("value", "expected"),
-    [
-        (0.12345678, b"0.123457"),
-        (1.23456789, b"1.234568"),
-        (12345.6789, b"12345.68"),
-        (1234567.8, b"1234568 "),
-        (12345678.9, b"12345679"),
-        (-0.987654321, b"-0.98765"),
-        (-0.444444, b"-0.44444"),
-    ],
-)
-def test_encode_float_requiring_rounding(value: float, expected: bytes):
-    with pytest.warns(UserWarning, match="exceeds maximum field length 8, rounding"):
-        assert encode_float(value, 8) == expected
-
-
 @pytest.mark.parametrize("field", [b"1E2345  ", b"-1E2345 "])
 def test_decode_float_exceeding_float_range_fails(field: bytes):
     with pytest.raises(ValueError, match="outside float range"):

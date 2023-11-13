@@ -436,34 +436,6 @@ def test_write_data_that_exceeds_physical_range(
         )
 
 
-@pytest.mark.parametrize(
-    ("physical_range", "actual_data"),
-    [
-        pytest.param(
-            FloatRange(-18.0000, 112.5432),
-            [13.0, -17.9, -18.0, 112.543249],
-            id="Exceeds maximum",
-        ),
-        pytest.param(
-            FloatRange(-18.1234, 112.5432),
-            [13.0, -18.123449, -18.0, 110.0],
-            id="Exceeds minimum",
-        ),
-    ],
-)
-def test_write_data_that_exceeds_physical_range_within_decimal_rounding(
-    physical_range: FloatRange, actual_data: list[float], tmp_file: Path
-) -> None:
-    signals = [
-        EdfSignal(
-            data=np.asarray(actual_data, dtype="float64"),
-            sampling_frequency=1,
-            physical_range=physical_range,
-        )
-    ]
-    Edf(signals).write(tmp_file)
-
-
 def test_physical_values_are_mapped_to_digital_values_with_minimal_error(
     tmp_file: Path,
 ):
@@ -551,8 +523,7 @@ def test_edf_signal_data_cannot_be_modified(dummy_edf_signal: EdfSignal):
 def test_edf_signal_requiring_rounding_in_physical_max_is_written_and_read_correctly(
     tmp_file: Path,
 ):
-    with pytest.warns(UserWarning, match="exceeds maximum field length 8"):
-        signal = EdfSignal(np.arange(10), 1, physical_range=(0, 10.123456789))
+    signal = EdfSignal(np.arange(10), 1, physical_range=(0, 10.123456789))
     edf = Edf(signals=[signal])
     edf.write(tmp_file)
     loaded_signal = read_edf(tmp_file).signals[0]
@@ -978,3 +949,10 @@ def test_writing_edfplus_works_with_data_record_duration_different_from_1(
         data_record_duration=data_record_duration,
     )
     edf.to_bytes()
+
+
+def test_rounding_of_physical_range_does_not_produce_clipping_or_integer_overflow():
+    data = np.array([0, 0.0000014999])
+    sig = EdfSignal(data, 1)
+    np.testing.assert_allclose(sig.data, data, atol=1e-11)
+    assert sig._digital.tolist() == [-32768, 16380]
