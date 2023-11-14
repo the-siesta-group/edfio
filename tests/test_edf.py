@@ -955,4 +955,5 @@ def test_rounding_of_physical_range_does_not_produce_clipping_or_integer_overflo
     data = np.array([0, 0.0000014999])
     sig = EdfSignal(data, 1)
     np.testing.assert_allclose(sig.data, data, atol=1e-11)
+    # round((0.0000014999 - 0.0) / 0.000002 * 65535 + (-32768)) = 16380
     assert sig._digital.tolist() == [-32768, 16380]
