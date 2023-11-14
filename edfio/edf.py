@@ -9,6 +9,7 @@ import re
 import warnings
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
+from decimal import Decimal
 from fractions import Fraction
 from functools import singledispatch
 from pathlib import Path
@@ -1327,12 +1328,13 @@ def _calculate_num_data_records(
         raise ValueError(
             f"data_record_duration must be positive, got {data_record_duration}"
         )
-    required_num_data_records = signal_duration / data_record_duration
-    if required_num_data_records != int(required_num_data_records):
-        raise ValueError(
-            f"Signal duration of {signal_duration}s is not exactly divisible by data_record_duration of {data_record_duration}s"
-        )
-    return int(required_num_data_records)
+    for f in (lambda x: x, lambda x: Decimal(str(x))):
+        required_num_data_records = f(signal_duration) / f(data_record_duration)
+        if required_num_data_records == int(required_num_data_records):
+            return int(required_num_data_records)
+    raise ValueError(
+        f"Signal duration of {signal_duration}s is not exactly divisible by data_record_duration of {data_record_duration}s"
+    )
 
 
 def _calculate_data_record_duration(signals: Sequence[EdfSignal]) -> float:
