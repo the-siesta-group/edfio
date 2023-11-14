@@ -3,7 +3,6 @@ from __future__ import annotations
 import datetime
 import math
 import re
-import warnings
 from abc import ABC, abstractmethod
 from collections.abc import Iterator
 from typing import Any, Generic, TypeVar, overload
@@ -30,20 +29,9 @@ def encode_int(value: int, length: int) -> bytes:
 
 
 def encode_float(value: float, length: int) -> bytes:
-    value_str = str(value)
-    if len(value_str) > length:
-        integer_part_length = len(str(int(value)))
-        if value < 0 and int(value) == 0:
-            integer_part_length = 2
-        if integer_part_length > length:
-            raise ValueError(f"{value} exceeds maximum field length {length}")
-        if integer_part_length == length:
-            value_str = f"{value:.0f}"
-        else:
-            value_str = f"{value:.{length-1-integer_part_length}f}"
-        msg = f"{value} exceeds maximum field length {length}, rounding to {value_str}"
-        warnings.warn(msg)
-    return encode_str(value_str, length)
+    if float(value).is_integer():
+        value = int(value)
+    return encode_str(str(value), length)
 
 
 def decode_float(field: bytes) -> float:

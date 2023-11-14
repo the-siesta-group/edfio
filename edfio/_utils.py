@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import datetime
 import inspect
-from typing import Any, NamedTuple
+from typing import Any, Callable, NamedTuple
 
 
 def calculate_gain_and_offset(
@@ -76,3 +76,15 @@ def encode_annotation_duration(duration: float) -> str:
     if string[-1] == ".":
         return string[:-1]
     return string
+
+
+def round_float_to_8_characters(
+    value: float,
+    round_func: Callable[[float], int],
+) -> float:
+    length = 8
+    integer_part_length = str(value).find(".")
+    if integer_part_length == length:
+        return round_func(value)
+    factor = 10 ** (length - 1 - integer_part_length)
+    return round_func(value * factor) / factor
