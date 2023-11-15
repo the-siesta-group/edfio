@@ -3,6 +3,7 @@ import pytest
 from edfio._header_field import (
     RawHeaderFieldDate,
     decode_float,
+    decode_str,
     encode_float,
     encode_int,
 )
@@ -28,6 +29,11 @@ def test_encode_float_exceeding_field_length_fails():
 )
 def test_encode_float(value: float, expected: bytes):
     assert encode_float(value, 8) == expected
+
+
+def test_decode_str():
+    assert decode_str("è".encode("latin-1")) == "�"
+    assert decode_str("è".encode()) == "è"
 
 
 @pytest.mark.parametrize("field", [b"1E2345  ", b"-1E2345 "])
