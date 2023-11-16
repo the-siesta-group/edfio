@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+### Fixed
+- Disallow creating a new Edf with a recording startdate not between 1985-01-01 and 2084-12-31 ([#5](https://github.com/the-siesta-group/edfio/pull/4)).
+
 ## [0.2.0] - 2023-11-16
 
 ### Added
