@@ -925,7 +925,7 @@ class Edf:
     def _set_startdate_with_recording(self, recording: Recording) -> None:
         try:
             self._startdate = recording.startdate
-        except ValueError:
+        except AnonymizedDateError:
             self._startdate = datetime.date(1985, 1, 1)
 
     def anonymize(self) -> None:

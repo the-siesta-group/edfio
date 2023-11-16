@@ -980,3 +980,15 @@ def test_calculate_num_data_records(
     result: int,
 ):
     assert _calculate_num_data_records(signal_duration, data_record_duration) == result
+
+
+@pytest.mark.parametrize(
+    "startdate",
+    [
+        datetime.date(1984, 12, 31),
+        datetime.date(2085, 1, 1),
+    ],
+)
+def test_startdate_outside_edf_compatible_range_raises_error(startdate: datetime.date):
+    with pytest.raises(ValueError, match="EDF only allows dates from 1985 to 2084"):
+        Edf([EdfSignal(np.arange(2), 1)], recording=Recording(startdate=startdate))
