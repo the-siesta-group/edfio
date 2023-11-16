@@ -19,7 +19,7 @@ from edfio import (
     read_edf,
 )
 from edfio._utils import FloatRange, IntRange
-from edfio.edf import _create_annotations_signal
+from edfio.edf import _calculate_num_data_records, _create_annotations_signal
 from tests import TEST_DATA_DIR
 
 EDF_FILE = TEST_DATA_DIR / "short_psg.edf"
@@ -957,3 +957,26 @@ def test_rounding_of_physical_range_does_not_produce_clipping_or_integer_overflo
     np.testing.assert_allclose(sig.data, data, atol=1e-11)
     # round((0.0000014999 - 0.0) / 0.000002 * 65535 + (-32768)) = 16380
     assert sig._digital.tolist() == [-32768, 16380]
+
+
+@pytest.mark.parametrize(
+    ("signal_duration", "data_record_duration", "result"),
+    [
+        (11, 1, 11),
+        (1.1, 0.1, 11),
+        (1.01, 0.01, 101),
+        (1.001, 0.001, 1001),
+        (1.0001, 0.0001, 10001),
+        (1.00001, 0.00001, 100001),
+        (1.000001, 0.000001, 1000001),
+        (1.0000001, 0.0000001, 10000001),
+        (1, 1 / 3, 3),
+        (1, 1 / 333333, 333333),
+    ],
+)
+def test_calculate_num_data_records(
+    signal_duration: float,
+    data_record_duration: float,
+    result: int,
+):
+    assert _calculate_num_data_records(signal_duration, data_record_duration) == result
