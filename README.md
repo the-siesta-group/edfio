@@ -2,8 +2,10 @@
 
 ![Python](https://img.shields.io/pypi/pyversions/edfio)
 [![PyPI](https://img.shields.io/pypi/v/edfio)](https://pypi.org/project/edfio/)
+[![conda-forge](https://img.shields.io/conda/v/conda-forge/edfio.svg?label=conda-forge)](https://anaconda.org/conda-forge/edfio)
 [![License](https://img.shields.io/pypi/l/edfio)](https://github.com/the-siesta-group/edfio/blob/main/LICENSE)
 [![Docs](https://readthedocs.org/projects/edfio/badge)](https://edfio.readthedocs.io/en/stable/index.html)
+
 [![Poetry](https://img.shields.io/endpoint?url=https://python-poetry.org/badge/v0.json)](https://python-poetry.org/)
 [![Checked with mypy](https://www.mypy-lang.org/static/mypy_badge.svg)](https://mypy-lang.org/)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
