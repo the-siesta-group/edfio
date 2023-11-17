@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+### Fixed
+- Disallow creating a new Edf where local patient/recording identification subfields are empty strings ([#6](https://github.com/the-siesta-group/edfio/pull/6)).
+
 ## [0.2.1] - 2023-11-17
 
 ### Fixed

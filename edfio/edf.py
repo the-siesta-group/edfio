@@ -37,6 +37,7 @@ from edfio._utils import (
     encode_edfplus_date,
     repr_from_init,
     round_float_to_8_characters,
+    validate_subfields,
 )
 
 _ANNOTATIONS_PATTERN = re.compile(
@@ -365,11 +366,10 @@ class Patient:
             "sex": sex,
             "birthdate": birthdate_field,
             "name": name,
+            **{f"additional[{i}]": v for i, v in enumerate(additional)},
         }
-        for key, value in subfields.items():
-            if " " in value:
-                raise ValueError(f"Subfield {key} contains spaces: {value!r}")
-        local_patient_identification = " ".join((*subfields.values(), *additional))
+        validate_subfields(subfields)
+        local_patient_identification = " ".join(subfields.values())
         encode_str(local_patient_identification, 80)
         self._local_patient_identification = local_patient_identification
 
@@ -460,17 +460,10 @@ class Recording:
             "hospital_administration_code": hospital_administration_code,
             "investigator_technician_code": investigator_technician_code,
             "equipment_code": equipment_code,
+            **{f"additional[{i}]": v for i, v in enumerate(additional)},
         }
-        for key, value in subfields.items():
-            if " " in value:
-                raise ValueError(f"Subfield {key} contains spaces: {value!r}")
-        local_recording_identification = " ".join(
-            (
-                "Startdate",
-                *subfields.values(),
-                *additional,
-            )
-        )
+        validate_subfields(subfields)
+        local_recording_identification = " ".join(("Startdate", *subfields.values()))
         encode_str(local_recording_identification, 80)
         self._local_recording_identification = local_recording_identification
 
