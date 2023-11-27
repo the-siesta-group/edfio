@@ -595,6 +595,8 @@ class Edf:
         data_record_duration: float | None = None,
         annotations: Iterable[EdfAnnotation] | None = None,
     ):
+        if not signals and not annotations:
+            raise ValueError("Edf must contain either signals or annotations")
         if patient is None:
             patient = Patient()
         if recording is None:
@@ -607,7 +609,7 @@ class Edf:
         self._data_record_duration = Edf.data_record_duration.encode(
             data_record_duration
         )
-        self.signals = tuple(signals)
+        self._set_num_data_records_with_signals(signals)
         self._version = Edf.version.encode(0)
         self.local_patient_identification = patient._to_str()
         self.local_recording_identification = recording._to_str()
@@ -617,8 +619,8 @@ class Edf:
         if starttime.microsecond and annotations is None:
             warnings.warn("Creating EDF+C to store microsecond starttime.")
         if annotations is not None or starttime.microsecond:
-            self.signals = (
-                *self.signals,
+            signals = (
+                *signals,
                 _create_annotations_signal(
                     annotations if annotations is not None else (),
                     num_data_records=self.num_data_records,
@@ -627,6 +629,7 @@ class Edf:
                 ),
             )
             self._reserved = Edf.reserved.encode("EDF+C")
+        self.signals = tuple(signals)
 
     def __repr__(self) -> str:
         return repr_from_init(self)
@@ -667,23 +670,35 @@ class Edf:
 
     @signals.setter
     def signals(self, signals: Sequence[EdfSignal]) -> None:
-        signal_durations = [len(s._digital) / s.sampling_frequency for s in signals]
-        if any(v != signal_durations[0] for v in signal_durations[1:]):
-            raise ValueError(
-                f"Inconsistent signal durations (in seconds): {signal_durations}"
-            )
-
-        self._num_data_records = Edf.num_data_records.encode(
-            _calculate_num_data_records(
-                signal_durations[0],
-                self.data_record_duration,
-            )
-        )
-        self._signals = tuple(signals)
+        if not signals:
+            raise ValueError("signals must not be empty")
+        signals = tuple(signals)
+        self._set_num_data_records_with_signals(signals)
+        self._signals = signals
         self._bytes_in_header_record = Edf.bytes_in_header_record.encode(
             256 * (len(signals) + 1)
         )
         self._num_signals = Edf.num_signals.encode(len(signals))
+        if all(s.label == "EDF Annotations" for s in signals):
+            self._data_record_duration = Edf.data_record_duration.encode(0)
+
+    def _set_num_data_records_with_signals(
+        self,
+        signals: Sequence[EdfSignal],
+    ) -> None:
+        if not signals:
+            num_data_records = 1
+        else:
+            signal_durations = [len(s._digital) / s.sampling_frequency for s in signals]
+            if any(v != signal_durations[0] for v in signal_durations[1:]):
+                raise ValueError(
+                    f"Inconsistent signal durations (in seconds): {signal_durations}"
+                )
+            num_data_records = _calculate_num_data_records(
+                signal_durations[0],
+                self.data_record_duration,
+            )
+        self._num_data_records = Edf.num_data_records.encode(num_data_records)
 
     def _parse_signal_headers(self, raw_signal_headers: bytes) -> tuple[EdfSignal, ...]:
         raw_headers_split: dict[str, list[bytes]] = {}
