@@ -992,3 +992,30 @@ def test_calculate_num_data_records(
 def test_startdate_outside_edf_compatible_range_raises_error(startdate: datetime.date):
     with pytest.raises(ValueError, match="EDF only allows dates from 1985 to 2084"):
         Edf([EdfSignal(np.arange(2), 1)], recording=Recording(startdate=startdate))
+
+
+def test_edf_with_only_annotations_can_be_written(tmp_file: Path):
+    annotations = (
+        EdfAnnotation(0, 30, "Sleep Stage W"),
+        EdfAnnotation(30, 150, "Sleep Stage N1"),
+        EdfAnnotation(180, 60, "Sleep Stage N2"),
+    )
+    Edf([], annotations=annotations).write(tmp_file)
+    edf = read_edf(tmp_file)
+    assert edf.bytes_in_header_record == 512
+    assert edf.reserved == "EDF+C"
+    assert edf.data_record_duration == 0
+    assert edf.num_signals == 1
+    assert edf.num_data_records == 1
+    assert edf.annotations == annotations
+
+
+def test_edf_without_signals_or_annotations_cannot_be_created():
+    with pytest.raises(ValueError, match="must contain either signals or annotations"):
+        Edf([])
+
+
+def test_signals_cannot_be_set_to_empty_sequence_for_edf_without_annotations():
+    edf = Edf([EdfSignal(np.arange(2), 1)])
+    with pytest.raises(ValueError, match="signals must not be empty"):
+        edf.signals = []
