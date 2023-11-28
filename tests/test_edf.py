@@ -1063,3 +1063,62 @@ def test_drop_signals_does_not_allow_dropping_timekeeping_signal(selection):
     )
     with pytest.raises(ValueError, match="Can not drop EDF\\+ timekeeping signal"):
         edf.drop_signals(selection)
+
+
+@pytest.mark.parametrize(
+    "new_signal",
+    [
+        EdfSignal(np.arange(100), 10),
+        EdfSignal(np.arange(200), 20),
+        EdfSignal(np.arange(30), 3),
+    ],
+)
+def test_append_signals_single(new_signal: EdfSignal):
+    edf = Edf([EdfSignal(np.arange(100), 10), EdfSignal(np.arange(50), 5)])
+    new_signal = EdfSignal(np.arange(1000), 100)
+    edf.append_signals(new_signal)
+    assert edf.num_signals == 3
+    assert edf.signals[2] == new_signal
+
+
+def test_append_signals_multiple():
+    edf = Edf(
+        [
+            EdfSignal(np.arange(100), 10),
+            EdfSignal(np.arange(50), 5),
+        ]
+    )
+    new_signals = [
+        EdfSignal(np.arange(100), 10),
+        EdfSignal(np.arange(30), 3),
+    ]
+    edf.append_signals(new_signals)
+    assert edf.num_signals == 2 + len(new_signals)
+    for actual, expected in zip(new_signals, edf.signals[2:]):
+        assert actual == expected
+
+
+@pytest.mark.parametrize(
+    ("length", "sampling_frequency"),
+    [(1001, 10), (999, 10), (1000, 1.0001), (1, 0.011)],
+)
+def test_append_signals_raises_error_on_duration_mismatch(
+    length: int,
+    sampling_frequency: float,
+):
+    edf = Edf([EdfSignal(np.arange(1000), 10)])
+    with pytest.raises(ValueError, match="Inconsistent signal durations"):
+        edf.append_signals(EdfSignal(np.arange(length), sampling_frequency))
+
+
+@pytest.mark.parametrize(
+    ("length", "sampling_frequency"),
+    [(10, 0.5), (60, 3), (22, 1.1), (220, 11)],
+)
+def test_append_signals_raises_error_for_signals_incompatible_with_the_data_record_duration(
+    length: int,
+    sampling_frequency: float,
+):
+    edf = Edf([EdfSignal(np.arange(100), 5)], data_record_duration=0.2)
+    with pytest.raises(ValueError, match="Not all signal lengths can be split"):
+        edf.append_signals([EdfSignal(np.arange(length), sampling_frequency)])

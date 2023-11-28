@@ -709,6 +709,11 @@ class Edf:
                 signal_durations[0],
                 self.data_record_duration,
             )
+            signal_lengths = [len(s._digital) for s in signals]
+            if any(l % num_data_records for l in signal_lengths):
+                raise ValueError(
+                    f"Not all signal lengths can be split into {num_data_records} data records: {signal_lengths}"
+                )
         self._num_data_records = Edf.num_data_records.encode(num_data_records)
 
     def _parse_signal_headers(self, raw_signal_headers: bytes) -> tuple[EdfSignal, ...]:
@@ -1001,6 +1006,22 @@ class Edf:
             256 * (len(selected) + 1)
         )
         self._num_signals = Edf.num_signals.encode(len(selected))
+
+    def append_signals(self, new_signals: EdfSignal | Iterable[EdfSignal]) -> None:
+        """
+        Append one or more signal(s) to the Edf recording, after all existing ones.
+
+        Every signal must be compatible with the current `data_record_duration` and all
+        signal durations must match the overall recording duration.
+
+        Parameters
+        ----------
+        new_signals : EdfSignal | Iterable[EdfSignal]
+            The signal(s) to add.
+        """
+        if isinstance(new_signals, EdfSignal):
+            new_signals = [new_signals]
+        self.signals = (*self.signals, *new_signals)
 
     @property
     def _annotation_signals(self) -> Iterable[EdfSignal]:
