@@ -640,7 +640,7 @@ class Edf:
                 ),
             )
             self._reserved = Edf.reserved.encode("EDF+C")
-        self.signals = tuple(signals)
+        self._set_signals(signals)
 
     def __repr__(self) -> str:
         return repr_from_init(self)
@@ -675,12 +675,12 @@ class Edf:
         All signals contained in the recording, including annotation signals.
 
         Individual signals can not be removed, added, or replaced by modifying this
-        property. However, it can be set to a new sequence of `EdfSignal` objects.
+        property. Use :meth:`Edf.append_signals`, :meth:`Edf.drop_signals`, or
+        :attr:`EdfSignal.data`, respectively.
         """
         return self._signals
 
-    @signals.setter
-    def signals(self, signals: Sequence[EdfSignal]) -> None:
+    def _set_signals(self, signals: Sequence[EdfSignal]) -> None:
         if not signals:
             raise ValueError("signals must not be empty")
         signals = tuple(signals)
@@ -1021,7 +1021,7 @@ class Edf:
         """
         if isinstance(new_signals, EdfSignal):
             new_signals = [new_signals]
-        self.signals = (*self.signals, *new_signals)
+        self._set_signals((*self.signals, *new_signals))
 
     @property
     def _annotation_signals(self) -> Iterable[EdfSignal]:
@@ -1149,7 +1149,7 @@ class Edf:
                 stop_index = stop * signal.sampling_frequency
                 signal._digital = signal._digital[int(start_index) : int(stop_index)]
                 signals.append(signal)
-        self.signals = tuple(signals)
+        self._set_signals(signals)
         self._shift_startdatetime(int(start))
 
     def slice_between_annotations(

@@ -335,30 +335,6 @@ def test_edf_signal_from_raw_header_has_no_data_by_default():
         sig.data
 
 
-def test_removing_signals_from_edf_sets_bytes_in_header_record_and_num_signals():
-    edf = read_edf(EDF_FILE)
-    edf.signals = edf.signals[:2]
-    assert edf.bytes_in_header_record == 256 * 3
-    assert edf.num_signals == 2
-
-
-def test_overwriting_signals_in_edf_sets_correct_header_fields():
-    signals = [
-        EdfSignal(sine(5, 2, 30), 30, physical_range=(-1, 1)),
-        EdfSignal(sine(5, 2, 20), 20, physical_range=(-1, 1)),
-    ]
-    edf = Edf(signals)
-
-    edf.signals = [
-        EdfSignal(sine(3, 2, 30), 30, physical_range=(-1, 1)),
-        EdfSignal(sine(3, 2, 20), 20, physical_range=(-1, 1)),
-        EdfSignal(sine(3, 2, 10), 10, physical_range=(-1, 1)),
-    ]
-    assert edf.bytes_in_header_record == 256 * 4
-    assert edf.num_signals == 3
-    assert edf.num_data_records == 3
-
-
 def test_read_write_roundtrip(tmp_file: Path):
     edf = read_edf(EDF_FILE)
     edf.write(tmp_file)
@@ -1025,12 +1001,6 @@ def test_edf_with_only_annotations_can_be_written(tmp_file: Path):
 def test_edf_without_signals_or_annotations_cannot_be_created():
     with pytest.raises(ValueError, match="must contain either signals or annotations"):
         Edf([])
-
-
-def test_signals_cannot_be_set_to_empty_sequence_for_edf_without_annotations():
-    edf = Edf([EdfSignal(np.arange(2), 1)])
-    with pytest.raises(ValueError, match="signals must not be empty"):
-        edf.signals = []
 
 
 def test_get_starttime_from_file_with_reserved_field_indicating_edfplus_but_no_annotations_signal(

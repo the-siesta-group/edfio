@@ -1,6 +1,8 @@
 # Changelog
 
 ## [Unreleased]
+### Changed
+- `Edf.signals` can not be set anymore. Use `Edf.append_signals()`, `Edf.drop_signals()`, and `EdfSignal.data` instead ([#10](https://github.com/the-siesta-group/edfio/pull/10)).
 
 ### Added
 - Allow creating a new Edf containing only annotations ([#7](https://github.com/the-siesta-group/edfio/pull/7)).
