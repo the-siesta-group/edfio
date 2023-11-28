@@ -8,6 +8,7 @@ from pathlib import Path
 
 import numpy as np
 import pytest
+from numpy.testing import assert_array_equal
 
 from edfio import (
     AnonymizedDateError,
@@ -1029,3 +1030,38 @@ def test_get_starttime_from_file_with_reserved_field_indicating_edfplus_but_no_a
     edf._reserved = Edf.reserved.encode("EDF+C")
     edf.write(tmp_file)
     assert read_edf(tmp_file).starttime == starttime
+
+
+def test_resample_signal():
+    edf = Edf(
+        [
+            EdfSignal(np.arange(10), 10, digital_range=(0, 9), physical_range=(0, 9)),
+        ],
+    )
+    edf.signals[0].resample(5, np.arange(0, 10, 2))
+    assert edf.signals[0].sampling_frequency == 5
+    assert_array_equal(edf.signals[0].data, np.arange(0, 10, 2))
+
+
+def test_resample_signal_invalid_duration():
+    edf = Edf(
+        [
+            EdfSignal(np.arange(10), 10, digital_range=(0, 9), physical_range=(0, 9)),
+        ],
+    )
+    with pytest.raises(ValueError, match="Resampled data has wrong length"):
+        edf.signals[0].resample(5, np.arange(0, 10, 2.5))
+
+
+def test_resample_signal_noninteger_sampling_rates():
+    edf = Edf(
+        [
+            EdfSignal(
+                np.arange(11), 5.5, digital_range=(0, 10), physical_range=(0, 10)
+            ),
+        ],
+        data_record_duration=2,
+    )
+    edf.signals[0].resample(5, np.arange(0, 10))
+    assert edf.signals[0].sampling_frequency == 5
+    assert_array_equal(edf.signals[0].data, np.arange(0, 10))

@@ -322,6 +322,29 @@ class EdfSignal:
         )
         self._digital = np.round(data / gain - offset).astype(np.int16)
 
+    def resample(
+        self, sampling_frequency: float, resampled_data: npt.NDArray[np.float64]
+    ) -> None:
+        """
+        Resample the signal to a new number of samples per data record.
+
+        Parameters
+        ----------
+        samples_per_record : int
+            The new number of samples per data record.
+        resampled_data : npt.NDArray[np.float64]
+            The resampled data. Must not change the signal duration.
+        """
+        factor = sampling_frequency / self.sampling_frequency
+        expected_len = len(self._digital) * factor
+        tolerance = 0.000001
+        if abs(expected_len - len(resampled_data)) > tolerance:
+            raise ValueError(
+                f"Resampled data has wrong length {len(resampled_data)}, expected {expected_len}."
+            )
+        self._sampling_frequency = sampling_frequency
+        self._set_data(resampled_data)
+
 
 class Patient:
     """
