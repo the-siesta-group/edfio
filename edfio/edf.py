@@ -982,8 +982,14 @@ class Edf:
             drop = [drop]
         selected: list[EdfSignal] = []
         dropped: list[int | str] = []
+        try:
+            timekeeping_signal = self._timekeeping_signal
+        except StopIteration:
+            timekeeping_signal = None
         for i, signal in enumerate(self.signals):
             if i in drop or signal.label in drop:
+                if signal is timekeeping_signal:
+                    raise ValueError("Can not drop EDF+ timekeeping signal.")
                 dropped.append(i)
                 dropped.append(signal.label)
             else:

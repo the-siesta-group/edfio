@@ -1041,3 +1041,25 @@ def test_get_starttime_from_file_with_reserved_field_indicating_edfplus_but_no_a
     edf._reserved = Edf.reserved.encode("EDF+C")
     edf.write(tmp_file)
     assert read_edf(tmp_file).starttime == starttime
+
+
+@pytest.mark.parametrize("selection", [[1], ["EDF Annotations"]])
+def test_drop_signals_does_not_allow_dropping_timekeeping_signal(selection):
+    edf = Edf(
+        signals=[
+            EdfSignal(np.arange(2), sampling_frequency=1),
+            _create_annotations_signal(
+                [EdfAnnotation(0, None, "ann 1")],
+                num_data_records=2,
+                data_record_duration=1,
+            ),
+            _create_annotations_signal(
+                [EdfAnnotation(0.25, None, "ann 2")],
+                num_data_records=2,
+                data_record_duration=1,
+                with_timestamps=False,
+            ),
+        ],
+    )
+    with pytest.raises(ValueError, match="Can not drop EDF\\+ timekeeping signal"):
+        edf.drop_signals(selection)
