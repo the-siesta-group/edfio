@@ -681,8 +681,6 @@ class Edf:
         return self._signals
 
     def _set_signals(self, signals: Sequence[EdfSignal]) -> None:
-        if not signals:
-            raise ValueError("signals must not be empty")
         signals = tuple(signals)
         self._set_num_data_records_with_signals(signals)
         self._signals = signals
