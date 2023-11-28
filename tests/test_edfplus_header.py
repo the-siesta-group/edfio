@@ -322,3 +322,49 @@ def test_edf_startdate_falls_back_to_legacy_field_if_recording_field_is_not_vali
     edf = Edf([EdfSignal(np.arange(10), 1)], recording=Recording(startdate=startdate))
     edf._local_recording_identification = local_recording_identification.ljust(80)
     assert edf.startdate == startdate
+
+
+@pytest.mark.parametrize(
+    ("code", "name", "additional"),
+    [
+        ("", "X", ()),
+        ("X", "", ()),
+        ("X", "X", ("add1", "", "add2")),
+    ],
+)
+def test_patient_raises_error_on_empty_subfields(
+    code: str,
+    name: str,
+    additional: tuple[str, ...],
+):
+    with pytest.raises(ValueError, match="must not be an empty string"):
+        Patient(code=code, name=name, additional=additional)
+
+
+@pytest.mark.parametrize(
+    (
+        "hospital_administration_code",
+        "investigator_technician_code",
+        "equipment_code",
+        "additional",
+    ),
+    [
+        ("", "X", "X", ()),
+        ("X", "", "X", ()),
+        ("X", "X", "", ()),
+        ("X", "X", "X", ("add1", "", "add2")),
+    ],
+)
+def test_recording_raises_error_on_empty_subfields(
+    hospital_administration_code: str,
+    investigator_technician_code: str,
+    equipment_code: str,
+    additional: tuple[str, ...],
+):
+    with pytest.raises(ValueError, match="must not be an empty string"):
+        Recording(
+            hospital_administration_code=hospital_administration_code,
+            investigator_technician_code=investigator_technician_code,
+            equipment_code=equipment_code,
+            additional=additional,
+        )
