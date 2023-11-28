@@ -254,8 +254,10 @@ class EdfSignal:
         """
         Numpy array containing the physical signal values as floats.
 
-        To simplify avoiding inconsistencies between signal data and header fields, this
-        array is non-writable.
+        Can be overwritten with an array of equal length, in which case the physical
+        range is adjusted accordingly. However, to simplify avoiding inconsistencies
+        between signal data and header fields, individual values in the returned array
+        can not be modified.
         """
         try:
             gain, offset = calculate_gain_and_offset(
@@ -275,6 +277,15 @@ class EdfSignal:
             data = (self._digital + offset) * gain
         data.setflags(write=False)
         return data
+
+    @data.setter
+    def data(self, data: npt.NDArray[np.float64]) -> None:
+        if len(data) != len(self._digital):
+            raise ValueError(
+                f"Signal lengths must match: got {len(data)}, expected {len(self._digital)}."
+            )
+        self._set_physical_range(None, data)
+        self._set_data(data)
 
     def _set_digital_range(self, digital_range: tuple[int, int]) -> None:
         digital_range = IntRange(*digital_range)

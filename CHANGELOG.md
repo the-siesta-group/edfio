@@ -4,6 +4,7 @@
 
 ### Added
 - Allow creating a new Edf containing only annotations ([#7](https://github.com/the-siesta-group/edfio/pull/7)).
+- Allow setting `EdfSignal.data` with an array of equal length as the existing data ([#10](https://github.com/the-siesta-group/edfio/pull/10)).
 
 ### Fixed
 - Disallow creating a new Edf where local patient/recording identification subfields are empty strings ([#6](https://github.com/the-siesta-group/edfio/pull/6)).

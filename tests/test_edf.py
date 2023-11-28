@@ -510,9 +510,21 @@ def test_edf_signal_with_too_small_physical_range_fails():
         EdfSignal(np.arange(10), 1, physical_range=(3, 5))
 
 
-def test_edf_signal_data_is_unsettable(dummy_edf_signal: EdfSignal):
-    with pytest.raises(AttributeError):
-        dummy_edf_signal.data = np.arange(3)
+@pytest.mark.parametrize("data", [[-3, 3], [-3, 7], [-7, 7]])
+def test_edf_signal_data_can_be_set(data):
+    data = np.array(data)
+    signal = EdfSignal(np.array([-5, 5]), 1)
+    signal.data = data
+    np.testing.assert_array_equal(signal.data, data)
+    np.testing.assert_array_equal(signal._digital, np.array([-32768, 32767]))
+    assert signal.physical_range == FloatRange(data.min(), data.max())
+
+
+@pytest.mark.parametrize("length", [9, 11])
+def test_edf_signal_setting_data_fails_on_length_mismatch(length: int):
+    signal = EdfSignal(np.arange(10), 1)
+    with pytest.raises(ValueError, match="Signal lengths must match"):
+        signal.data = np.arange(length)
 
 
 def test_edf_signal_data_cannot_be_modified(dummy_edf_signal: EdfSignal):
