@@ -7,6 +7,7 @@
 
 ### Fixed
 - Disallow creating a new Edf where local patient/recording identification subfields are empty strings ([#6](https://github.com/the-siesta-group/edfio/pull/6)).
+- Allow retrieving the starttime from a file where the reserved field indicates it is an EDF+C but no annotations signal is present ([#8](https://github.com/the-siesta-group/edfio/pull/8)).
 
 ## [0.2.1] - 2023-11-17
 

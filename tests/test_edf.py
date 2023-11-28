@@ -1019,3 +1019,13 @@ def test_signals_cannot_be_set_to_empty_sequence_for_edf_without_annotations():
     edf = Edf([EdfSignal(np.arange(2), 1)])
     with pytest.raises(ValueError, match="signals must not be empty"):
         edf.signals = []
+
+
+def test_get_starttime_from_file_with_reserved_field_indicating_edfplus_but_no_annotations_signal(
+    tmp_file: Path,
+):
+    starttime = datetime.time(22, 33, 44)
+    edf = Edf([EdfSignal(np.arange(2), 1)], starttime=starttime)
+    edf._reserved = Edf.reserved.encode("EDF+C")
+    edf.write(tmp_file)
+    assert read_edf(tmp_file).starttime == starttime

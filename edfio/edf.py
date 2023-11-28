@@ -881,11 +881,12 @@ class Edf:
 
     @property
     def _subsecond_offset(self) -> float:
-        if self.reserved == "EDF+C":
+        try:
             timekeeping_raw = self._timekeeping_signal._digital.tobytes()
             first_data_record = timekeeping_raw[: timekeeping_raw.find(b"\x00") + 1]
             return _EdfAnnotationsDataRecord.from_bytes(first_data_record).tals[0].onset
-        return 0
+        except StopIteration:
+            return 0
 
     @property
     def starttime(self) -> datetime.time:
