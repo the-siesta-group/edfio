@@ -2,11 +2,11 @@
 
 ## [Unreleased]
 ### Changed
-- `Edf.signals` can not be set anymore. Use `Edf.append_signals()`, `Edf.drop_signals()`, and `EdfSignal.data` instead ([#10](https://github.com/the-siesta-group/edfio/pull/10)).
+- `Edf.signals` can not be set anymore. Use `Edf.append_signals()`, `Edf.drop_signals()`, and `EdfSignal.update_data()` instead ([#10](https://github.com/the-siesta-group/edfio/pull/10)).
 
 ### Added
 - Allow creating a new Edf containing only annotations ([#7](https://github.com/the-siesta-group/edfio/pull/7)).
-- Allow setting `EdfSignal.data` with an array of equal length as the existing data ([#10](https://github.com/the-siesta-group/edfio/pull/10)).
+- Add `EdfSignal.update_data` for overwriting the physical values with an array of equal length ([#10](https://github.com/the-siesta-group/edfio/pull/10)).
 - Allow adding new signals to an Edf with `Edf.append_signals` ([#10](https://github.com/the-siesta-group/edfio/pull/10)).
 
 ### Fixed

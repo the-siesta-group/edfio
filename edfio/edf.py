@@ -254,10 +254,9 @@ class EdfSignal:
         """
         Numpy array containing the physical signal values as floats.
 
-        Can be overwritten with an array of equal length, in which case the physical
-        range is adjusted accordingly. However, to simplify avoiding inconsistencies
-        between signal data and header fields, individual values in the returned array
-        can not be modified.
+        To simplify avoiding inconsistencies between signal data and header fields,
+        individual values in the returned array can not be modified. Use
+        :meth:`EdfSignal.update_data` to overwrite with new physical data.
         """
         try:
             gain, offset = calculate_gain_and_offset(
@@ -278,8 +277,15 @@ class EdfSignal:
         data.setflags(write=False)
         return data
 
-    @data.setter
-    def data(self, data: npt.NDArray[np.float64]) -> None:
+    def update_data(self, data: npt.NDArray[np.float64]) -> None:
+        """
+        Overwrite physical signal values with an array of equal length.
+
+        Parameters
+        ----------
+        data : npt.NDArray[np.float64]
+            The new physical data.
+        """
         if len(data) != len(self._digital):
             raise ValueError(
                 f"Signal lengths must match: got {len(data)}, expected {len(self._digital)}."
