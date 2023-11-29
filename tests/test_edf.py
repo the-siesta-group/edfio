@@ -503,6 +503,30 @@ def test_edf_signal_update_data_fails_on_length_mismatch(length: int):
         signal.update_data(np.arange(length))
 
 
+def test_edf_signal_update_data_keep_physical_range():
+    signal = EdfSignal(
+        np.array([90.1, 98.3, 100.0]),
+        1,
+        physical_range=(0, 100),
+        digital_range=(0, 1000),
+    )
+    new_data = np.array([92.3, 97.5, 99.9])
+    signal.update_data(new_data, keep_physical_range=True)
+    assert signal.physical_range == (0, 100)
+    assert signal.digital_range == (0, 1000)
+    np.testing.assert_almost_equal(signal.data, new_data, decimal=14)
+    np.testing.assert_array_equal(signal._digital, new_data * 10)
+
+
+@pytest.mark.parametrize("data", [[-7, 3], [-3, 7], [-7, 7]])
+def test_edf_signal_update_data_keep_physical_range_raises_error_if_new_data_exceeds_physical_range(
+    data,
+):
+    signal = EdfSignal(np.array([-5, 5]), 1)
+    with pytest.raises(ValueError, match="Signal range .* out of physical range"):
+        signal.update_data(np.array(data), keep_physical_range=True)
+
+
 def test_edf_signal_data_cannot_be_modified(dummy_edf_signal: EdfSignal):
     with pytest.raises(ValueError, match="assignment destination is read-only"):
         dummy_edf_signal.data[5] = -1

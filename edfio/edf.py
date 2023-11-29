@@ -277,7 +277,12 @@ class EdfSignal:
         data.setflags(write=False)
         return data
 
-    def update_data(self, data: npt.NDArray[np.float64]) -> None:
+    def update_data(
+        self,
+        data: npt.NDArray[np.float64],
+        *,
+        keep_physical_range: bool = False,
+    ) -> None:
         """
         Overwrite physical signal values with an array of equal length.
 
@@ -285,12 +290,15 @@ class EdfSignal:
         ----------
         data : npt.NDArray[np.float64]
             The new physical data.
+        keep_physical_range : bool, default: False
+            If `True`, the `physical_range` is not modified to accomodate the new data.
         """
         if len(data) != len(self._digital):
             raise ValueError(
                 f"Signal lengths must match: got {len(data)}, expected {len(self._digital)}."
             )
-        self._set_physical_range(None, data)
+        physical_range = self.physical_range if keep_physical_range else None
+        self._set_physical_range(physical_range, data)
         self._set_data(data)
 
     def _set_digital_range(self, digital_range: tuple[int, int]) -> None:
