@@ -335,30 +335,6 @@ def test_edf_signal_from_raw_header_has_no_data_by_default():
         sig.data
 
 
-def test_removing_signals_from_edf_sets_bytes_in_header_record_and_num_signals():
-    edf = read_edf(EDF_FILE)
-    edf.signals = edf.signals[:2]
-    assert edf.bytes_in_header_record == 256 * 3
-    assert edf.num_signals == 2
-
-
-def test_overwriting_signals_in_edf_sets_correct_header_fields():
-    signals = [
-        EdfSignal(sine(5, 2, 30), 30, physical_range=(-1, 1)),
-        EdfSignal(sine(5, 2, 20), 20, physical_range=(-1, 1)),
-    ]
-    edf = Edf(signals)
-
-    edf.signals = [
-        EdfSignal(sine(3, 2, 30), 30, physical_range=(-1, 1)),
-        EdfSignal(sine(3, 2, 20), 20, physical_range=(-1, 1)),
-        EdfSignal(sine(3, 2, 10), 10, physical_range=(-1, 1)),
-    ]
-    assert edf.bytes_in_header_record == 256 * 4
-    assert edf.num_signals == 3
-    assert edf.num_data_records == 3
-
-
 def test_read_write_roundtrip(tmp_file: Path):
     edf = read_edf(EDF_FILE)
     edf.write(tmp_file)
@@ -510,9 +486,45 @@ def test_edf_signal_with_too_small_physical_range_fails():
         EdfSignal(np.arange(10), 1, physical_range=(3, 5))
 
 
-def test_edf_signal_data_is_unsettable(dummy_edf_signal: EdfSignal):
-    with pytest.raises(AttributeError):
-        dummy_edf_signal.data = np.arange(3)
+@pytest.mark.parametrize("data", [[-3, 3], [-3, 7], [-7, 7]])
+def test_edf_signal_update_data(data):
+    data = np.array(data)
+    signal = EdfSignal(np.array([-5, 5]), 1)
+    signal.update_data(data)
+    np.testing.assert_array_equal(signal.data, data)
+    np.testing.assert_array_equal(signal._digital, np.array([-32768, 32767]))
+    assert signal.physical_range == FloatRange(data.min(), data.max())
+
+
+@pytest.mark.parametrize("length", [9, 11])
+def test_edf_signal_update_data_fails_on_length_mismatch(length: int):
+    signal = EdfSignal(np.arange(10), 1)
+    with pytest.raises(ValueError, match="Signal lengths must match"):
+        signal.update_data(np.arange(length))
+
+
+def test_edf_signal_update_data_keep_physical_range():
+    signal = EdfSignal(
+        np.array([90.1, 98.3, 100.0]),
+        1,
+        physical_range=(0, 100),
+        digital_range=(0, 1000),
+    )
+    new_data = np.array([92.3, 97.5, 99.9])
+    signal.update_data(new_data, keep_physical_range=True)
+    assert signal.physical_range == (0, 100)
+    assert signal.digital_range == (0, 1000)
+    np.testing.assert_almost_equal(signal.data, new_data, decimal=14)
+    np.testing.assert_array_equal(signal._digital, new_data * 10)
+
+
+@pytest.mark.parametrize("data", [[-7, 3], [-3, 7], [-7, 7]])
+def test_edf_signal_update_data_keep_physical_range_raises_error_if_new_data_exceeds_physical_range(
+    data,
+):
+    signal = EdfSignal(np.array([-5, 5]), 1)
+    with pytest.raises(ValueError, match="Signal range .* out of physical range"):
+        signal.update_data(np.array(data), keep_physical_range=True)
 
 
 def test_edf_signal_data_cannot_be_modified(dummy_edf_signal: EdfSignal):
@@ -1015,12 +1027,6 @@ def test_edf_without_signals_or_annotations_cannot_be_created():
         Edf([])
 
 
-def test_signals_cannot_be_set_to_empty_sequence_for_edf_without_annotations():
-    edf = Edf([EdfSignal(np.arange(2), 1)])
-    with pytest.raises(ValueError, match="signals must not be empty"):
-        edf.signals = []
-
-
 def test_get_starttime_from_file_with_reserved_field_indicating_edfplus_but_no_annotations_signal(
     tmp_file: Path,
 ):
@@ -1029,3 +1035,84 @@ def test_get_starttime_from_file_with_reserved_field_indicating_edfplus_but_no_a
     edf._reserved = Edf.reserved.encode("EDF+C")
     edf.write(tmp_file)
     assert read_edf(tmp_file).starttime == starttime
+
+
+@pytest.mark.parametrize("selection", [[1], ["EDF Annotations"]])
+def test_drop_signals_does_not_allow_dropping_timekeeping_signal(selection):
+    edf = Edf(
+        signals=[
+            EdfSignal(np.arange(2), sampling_frequency=1),
+            _create_annotations_signal(
+                [EdfAnnotation(0, None, "ann 1")],
+                num_data_records=2,
+                data_record_duration=1,
+            ),
+            _create_annotations_signal(
+                [EdfAnnotation(0.25, None, "ann 2")],
+                num_data_records=2,
+                data_record_duration=1,
+                with_timestamps=False,
+            ),
+        ],
+    )
+    with pytest.raises(ValueError, match="Can not drop EDF\\+ timekeeping signal"):
+        edf.drop_signals(selection)
+
+
+@pytest.mark.parametrize(
+    "new_signal",
+    [
+        EdfSignal(np.arange(100), 10),
+        EdfSignal(np.arange(200), 20),
+        EdfSignal(np.arange(30), 3),
+    ],
+)
+def test_append_signals_single(new_signal: EdfSignal):
+    edf = Edf([EdfSignal(np.arange(100), 10), EdfSignal(np.arange(50), 5)])
+    new_signal = EdfSignal(np.arange(1000), 100)
+    edf.append_signals(new_signal)
+    assert edf.num_signals == 3
+    assert edf.signals[2] == new_signal
+
+
+def test_append_signals_multiple():
+    edf = Edf(
+        [
+            EdfSignal(np.arange(100), 10),
+            EdfSignal(np.arange(50), 5),
+        ]
+    )
+    new_signals = [
+        EdfSignal(np.arange(100), 10),
+        EdfSignal(np.arange(30), 3),
+    ]
+    edf.append_signals(new_signals)
+    assert edf.num_signals == 2 + len(new_signals)
+    for actual, expected in zip(new_signals, edf.signals[2:]):
+        assert actual == expected
+
+
+@pytest.mark.parametrize(
+    ("length", "sampling_frequency"),
+    [(1001, 10), (999, 10), (1000, 10.001), (1, 0.011)],
+)
+def test_append_signals_raises_error_on_duration_mismatch(
+    length: int,
+    sampling_frequency: float,
+):
+    edf = Edf([EdfSignal(np.arange(1000), 10)])
+    with pytest.raises(ValueError, match="Inconsistent signal durations"):
+        edf.append_signals(EdfSignal(np.arange(length), sampling_frequency))
+
+
+@pytest.mark.parametrize(
+    ("length", "sampling_frequency"),
+    [(10, 0.5), (60, 3), (22, 1.1), (220, 11)],
+)
+def test_append_signals_raises_error_for_signals_incompatible_with_the_data_record_duration(
+    length: int,
+    sampling_frequency: float,
+):
+    edf = Edf([EdfSignal(np.arange(100), 5)], data_record_duration=0.2)
+    with pytest.raises(ValueError, match="Not all signal lengths can be split"):
+        edf.append_signals([EdfSignal(np.arange(length), sampling_frequency)])

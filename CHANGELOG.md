@@ -1,13 +1,18 @@
 # Changelog
 
 ## [Unreleased]
+### Changed
+- `Edf.signals` can not be set anymore. Use `Edf.append_signals()`, `Edf.drop_signals()`, and `EdfSignal.update_data()` instead ([#10](https://github.com/the-siesta-group/edfio/pull/10)).
 
 ### Added
 - Allow creating a new Edf containing only annotations ([#7](https://github.com/the-siesta-group/edfio/pull/7)).
+- Add `EdfSignal.update_data` for overwriting the physical values with an array of equal length ([#10](https://github.com/the-siesta-group/edfio/pull/10)).
+- Allow adding new signals to an Edf with `Edf.append_signals` ([#10](https://github.com/the-siesta-group/edfio/pull/10)).
 
 ### Fixed
 - Disallow creating a new Edf where local patient/recording identification subfields are empty strings ([#6](https://github.com/the-siesta-group/edfio/pull/6)).
 - Allow retrieving the starttime from a file where the reserved field indicates it is an EDF+C but no annotations signal is present ([#8](https://github.com/the-siesta-group/edfio/pull/8)).
+- Disallow removing the EDF+ timekeeping signal with `Edf.drop_signals` ([#10](https://github.com/the-siesta-group/edfio/pull/10)).
 
 ## [0.2.1] - 2023-11-17
 

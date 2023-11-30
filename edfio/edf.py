@@ -254,8 +254,9 @@ class EdfSignal:
         """
         Numpy array containing the physical signal values as floats.
 
-        To simplify avoiding inconsistencies between signal data and header fields, this
-        array is non-writable.
+        To simplify avoiding inconsistencies between signal data and header fields,
+        individual values in the returned array can not be modified. Use
+        :meth:`EdfSignal.update_data` to overwrite with new physical data.
         """
         try:
             gain, offset = calculate_gain_and_offset(
@@ -275,6 +276,30 @@ class EdfSignal:
             data = (self._digital + offset) * gain
         data.setflags(write=False)
         return data
+
+    def update_data(
+        self,
+        data: npt.NDArray[np.float64],
+        *,
+        keep_physical_range: bool = False,
+    ) -> None:
+        """
+        Overwrite physical signal values with an array of equal length.
+
+        Parameters
+        ----------
+        data : npt.NDArray[np.float64]
+            The new physical data.
+        keep_physical_range : bool, default: False
+            If `True`, the `physical_range` is not modified to accomodate the new data.
+        """
+        if len(data) != len(self._digital):
+            raise ValueError(
+                f"Signal lengths must match: got {len(data)}, expected {len(self._digital)}."
+            )
+        physical_range = self.physical_range if keep_physical_range else None
+        self._set_physical_range(physical_range, data)
+        self._set_data(data)
 
     def _set_digital_range(self, digital_range: tuple[int, int]) -> None:
         digital_range = IntRange(*digital_range)
@@ -629,7 +654,7 @@ class Edf:
                 ),
             )
             self._reserved = Edf.reserved.encode("EDF+C")
-        self.signals = tuple(signals)
+        self._set_signals(signals)
 
     def __repr__(self) -> str:
         return repr_from_init(self)
@@ -664,14 +689,12 @@ class Edf:
         All signals contained in the recording, including annotation signals.
 
         Individual signals can not be removed, added, or replaced by modifying this
-        property. However, it can be set to a new sequence of `EdfSignal` objects.
+        property. Use :meth:`Edf.append_signals`, :meth:`Edf.drop_signals`, or
+        :attr:`EdfSignal.data`, respectively.
         """
         return self._signals
 
-    @signals.setter
-    def signals(self, signals: Sequence[EdfSignal]) -> None:
-        if not signals:
-            raise ValueError("signals must not be empty")
+    def _set_signals(self, signals: Sequence[EdfSignal]) -> None:
         signals = tuple(signals)
         self._set_num_data_records_with_signals(signals)
         self._signals = signals
@@ -698,6 +721,11 @@ class Edf:
                 signal_durations[0],
                 self.data_record_duration,
             )
+            signal_lengths = [len(s._digital) for s in signals]
+            if any(l % num_data_records for l in signal_lengths):
+                raise ValueError(
+                    f"Not all signal lengths can be split into {num_data_records} data records: {signal_lengths}"
+                )
         self._num_data_records = Edf.num_data_records.encode(num_data_records)
 
     def _parse_signal_headers(self, raw_signal_headers: bytes) -> tuple[EdfSignal, ...]:
@@ -971,8 +999,14 @@ class Edf:
             drop = [drop]
         selected: list[EdfSignal] = []
         dropped: list[int | str] = []
+        try:
+            timekeeping_signal = self._timekeeping_signal
+        except StopIteration:
+            timekeeping_signal = None
         for i, signal in enumerate(self.signals):
             if i in drop or signal.label in drop:
+                if signal is timekeeping_signal:
+                    raise ValueError("Can not drop EDF+ timekeeping signal.")
                 dropped.append(i)
                 dropped.append(signal.label)
             else:
@@ -984,6 +1018,22 @@ class Edf:
             256 * (len(selected) + 1)
         )
         self._num_signals = Edf.num_signals.encode(len(selected))
+
+    def append_signals(self, new_signals: EdfSignal | Iterable[EdfSignal]) -> None:
+        """
+        Append one or more signal(s) to the Edf recording, after all existing ones.
+
+        Every signal must be compatible with the current `data_record_duration` and all
+        signal durations must match the overall recording duration.
+
+        Parameters
+        ----------
+        new_signals : EdfSignal | Iterable[EdfSignal]
+            The signal(s) to add.
+        """
+        if isinstance(new_signals, EdfSignal):
+            new_signals = [new_signals]
+        self._set_signals((*self.signals, *new_signals))
 
     @property
     def _annotation_signals(self) -> Iterable[EdfSignal]:
@@ -1111,7 +1161,7 @@ class Edf:
                 stop_index = stop * signal.sampling_frequency
                 signal._digital = signal._digital[int(start_index) : int(stop_index)]
                 signals.append(signal)
-        self.signals = tuple(signals)
+        self._set_signals(signals)
         self._shift_startdatetime(int(start))
 
     def slice_between_annotations(
