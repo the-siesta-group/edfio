@@ -82,6 +82,8 @@ def round_float_to_8_characters(
     value: float,
     round_func: Callable[[float], int],
 ) -> float:
+    if isinstance(value, int) or value.is_integer():
+        return value
     length = 8
     integer_part_length = str(value).find(".")
     if integer_part_length == length:
