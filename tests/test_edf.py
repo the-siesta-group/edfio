@@ -1094,7 +1094,7 @@ def test_append_signals_multiple():
 
 @pytest.mark.parametrize(
     ("length", "sampling_frequency"),
-    [(1001, 10), (999, 10), (1000, 1.0001), (1, 0.011)],
+    [(1001, 10), (999, 10), (1000, 10.001), (1, 0.011)],
 )
 def test_append_signals_raises_error_on_duration_mismatch(
     length: int,
