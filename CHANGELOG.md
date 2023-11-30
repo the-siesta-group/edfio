@@ -1,6 +1,9 @@
 # Changelog
 
 ## [Unreleased]
+### Added
+- Add optional parameter `sampling_frequency` to `EdfSignal.update_data()` for changing
+  the sampling frequency of the signal when updating its data.
 
 ## [0.3.0] - 2023-11-30
 

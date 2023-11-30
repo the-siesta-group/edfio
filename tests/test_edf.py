@@ -527,6 +527,73 @@ def test_edf_signal_update_data_keep_physical_range_raises_error_if_new_data_exc
         signal.update_data(np.array(data), keep_physical_range=True)
 
 
+def test_edf_signal_update_data_resampling():
+    edf = Edf(
+        [
+            EdfSignal(np.arange(10), 10, digital_range=(0, 9), physical_range=(0, 9)),
+        ],
+    )
+    edf.signals[0].update_data(
+        np.arange(0, 10, 2), sampling_frequency=5, keep_physical_range=True
+    )
+    assert edf.signals[0].sampling_frequency == 5
+    np.testing.assert_array_equal(edf.signals[0].data, np.arange(0, 10, 2))
+
+
+def test_edf_signal_update_data_resampling_noninteger_sampling_rates():
+    edf = Edf(
+        [
+            EdfSignal(
+                np.arange(11), 5.5, digital_range=(0, 10), physical_range=(0, 10)
+            ),
+        ],
+        data_record_duration=2,
+    )
+    edf.signals[0].update_data(
+        np.arange(0, 10), sampling_frequency=5, keep_physical_range=True
+    )
+    assert edf.signals[0].sampling_frequency == 5
+    np.testing.assert_array_equal(edf.signals[0].data, np.arange(0, 10))
+
+
+def test_edf_signal_update_data_resampling_invalid_duration():
+    edf = Edf(
+        [
+            EdfSignal(np.arange(10), 10, digital_range=(0, 9), physical_range=(0, 9)),
+        ],
+    )
+    with pytest.raises(ValueError, match="Signal lengths must match:"):
+        edf.signals[0].update_data(np.arange(0, 10, 2.5), sampling_frequency=5)
+
+
+@pytest.mark.parametrize(
+    ("sampling_frequency", "expected_error"),
+    [
+        pytest.param(
+            -10, "Sampling frequency must be positive", id="Negative sampling frequency"
+        ),
+        pytest.param(
+            -0, "Sampling frequency must be positive", id="Zero sampling frequency"
+        ),
+        pytest.param(
+            9.8, "non-integer number of samples", id="Non-integer number of samples"
+        ),
+    ],
+)
+def test_edf_signal_update_data_resampling_invalid_sampling_frequency(
+    sampling_frequency: float, expected_error: str
+):
+    edf = Edf(
+        [
+            EdfSignal(np.arange(10), 10, digital_range=(0, 9), physical_range=(0, 9)),
+        ],
+    )
+    with pytest.raises(ValueError, match=expected_error):
+        edf.signals[0].update_data(
+            np.arange(0, 10, 2), sampling_frequency=sampling_frequency
+        )
+
+
 def test_edf_signal_data_cannot_be_modified(dummy_edf_signal: EdfSignal):
     with pytest.raises(ValueError, match="assignment destination is read-only"):
         dummy_edf_signal.data[5] = -1
