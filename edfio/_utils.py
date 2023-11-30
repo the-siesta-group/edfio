@@ -87,6 +87,7 @@ def round_float_to_8_characters(
     if integer_part_length == length:
         return round_func(value)
     factor = 10 ** (length - 1 - integer_part_length)
+    print(value, factor)
     return round_func(value * factor) / factor
 
 
