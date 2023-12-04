@@ -552,25 +552,21 @@ def test_edf_signal_update_data_resampling_invalid_duration():
 
 
 @pytest.mark.parametrize(
-    ("sampling_frequency", "expected_error"),
-    [
-        pytest.param(
-            -10, "Sampling frequency must be positive", id="Negative sampling frequency"
-        ),
-        pytest.param(
-            -0, "Sampling frequency must be positive", id="Zero sampling frequency"
-        ),
-        pytest.param(
-            9.8, "non-integer number of samples", id="Non-integer number of samples"
-        ),
-    ],
+    "sampling_frequency",
+    [-10, 0],
 )
-def test_edf_signal_update_data_resampling_invalid_sampling_frequency(
-    sampling_frequency: float, expected_error: str
+def test_edf_signal_update_data_resampling_non_positive_sampling_frequency(
+    sampling_frequency: float,
 ):
     signal = EdfSignal(np.arange(10), 10, digital_range=(0, 9), physical_range=(0, 9))
-    with pytest.raises(ValueError, match=expected_error):
+    with pytest.raises(ValueError, match="Sampling frequency must be positive"):
         signal.update_data(np.arange(0, 10, 2), sampling_frequency=sampling_frequency)
+
+
+def test_edf_signal_update_data_resampling_non_integer_samples():
+    signal = EdfSignal(np.arange(10), 10, digital_range=(0, 9), physical_range=(0, 9))
+    with pytest.raises(ValueError, match="non-integer number of samples"):
+        signal.update_data(np.arange(0, 10, 2), sampling_frequency=9.8)
 
 
 def test_edf_signal_data_cannot_be_modified(dummy_edf_signal: EdfSignal):
