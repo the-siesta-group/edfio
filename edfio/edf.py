@@ -302,9 +302,7 @@ class EdfSignal:
             sampling_frequency is not None
             and sampling_frequency != self._sampling_frequency
         ):
-            expected_length = self._get_expected_new_length(
-                expected_length, sampling_frequency
-            )
+            expected_length = self._get_expected_new_length(sampling_frequency)
         if len(data) != expected_length:
             raise ValueError(
                 f"Signal lengths must match: got {len(data)}, expected {len(self._digital)}."
@@ -315,19 +313,18 @@ class EdfSignal:
             self._sampling_frequency = sampling_frequency
         self._set_data(data)
 
-    def _get_expected_new_length(
-        self, expected_length: int, sampling_frequency: float
-    ) -> int:
+    def _get_expected_new_length(self, sampling_frequency: float) -> int:
         if sampling_frequency <= 0:
             raise ValueError(
                 f"Sampling frequency must be positive, got {sampling_frequency}"
             )
+        current_length = len(self._digital)
         expected_length_f = (
-            sampling_frequency / self._sampling_frequency * expected_length
+            sampling_frequency / self._sampling_frequency * current_length
         )
         if not expected_length_f.is_integer():
             raise ValueError(
-                f"Sampling frequency of {sampling_frequency} results in non-integer number of samples ({expected_length})"
+                f"Sampling frequency of {sampling_frequency} results in non-integer number of samples ({expected_length_f})"
             )
         return round(expected_length_f)
 
