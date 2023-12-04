@@ -322,7 +322,11 @@ class EdfSignal:
         expected_length_f = (
             sampling_frequency / self._sampling_frequency * current_length
         )
-        if not expected_length_f.is_integer():
+        relative_tolerance = 1e-10
+        if (
+            abs(expected_length_f - round(expected_length_f)) / expected_length_f
+            > relative_tolerance
+        ):
             raise ValueError(
                 f"Sampling frequency of {sampling_frequency} results in non-integer number of samples ({expected_length_f})"
             )

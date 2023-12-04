@@ -569,6 +569,13 @@ def test_edf_signal_update_data_resampling_non_integer_samples():
         signal.update_data(np.arange(0, 10, 2), sampling_frequency=9.8)
 
 
+def test_edf_signal_update_data_resampling_tolerance():
+    signal = EdfSignal(np.arange(1000000), 100)
+    signal.update_data(np.arange(1000001), sampling_frequency=100.0001)
+    assert signal.sampling_frequency == 100.0001
+    assert len(signal.data) == 1000001
+
+
 def test_edf_signal_data_cannot_be_modified(dummy_edf_signal: EdfSignal):
     with pytest.raises(ValueError, match="assignment destination is read-only"):
         dummy_edf_signal.data[5] = -1
