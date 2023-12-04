@@ -282,6 +282,7 @@ class EdfSignal:
         data: npt.NDArray[np.float64],
         *,
         keep_physical_range: bool = False,
+        sampling_frequency: float | None = None,
     ) -> None:
         """
         Overwrite physical signal values with an array of equal length.
@@ -292,14 +293,44 @@ class EdfSignal:
             The new physical data.
         keep_physical_range : bool, default: False
             If `True`, the `physical_range` is not modified to accomodate the new data.
+        sampling_frequency : float | None, default: None
+            If not `None`, the `sampling_frequency` is updated to the new value. The new
+            data must match the expected length for the new sampling frequency.
         """
-        if len(data) != len(self._digital):
+        expected_length = len(self._digital)
+        if (
+            sampling_frequency is not None
+            and sampling_frequency != self._sampling_frequency
+        ):
+            expected_length = self._get_expected_new_length(sampling_frequency)
+        if len(data) != expected_length:
             raise ValueError(
                 f"Signal lengths must match: got {len(data)}, expected {len(self._digital)}."
             )
         physical_range = self.physical_range if keep_physical_range else None
         self._set_physical_range(physical_range, data)
+        if sampling_frequency is not None:
+            self._sampling_frequency = sampling_frequency
         self._set_data(data)
+
+    def _get_expected_new_length(self, sampling_frequency: float) -> int:
+        if sampling_frequency <= 0:
+            raise ValueError(
+                f"Sampling frequency must be positive, got {sampling_frequency}"
+            )
+        current_length = len(self._digital)
+        expected_length_f = (
+            sampling_frequency / self._sampling_frequency * current_length
+        )
+        relative_tolerance = 1e-10
+        if (
+            abs(expected_length_f - round(expected_length_f)) / expected_length_f
+            > relative_tolerance
+        ):
+            raise ValueError(
+                f"Sampling frequency of {sampling_frequency} results in non-integer number of samples ({expected_length_f})"
+            )
+        return round(expected_length_f)
 
     def _set_digital_range(self, digital_range: tuple[int, int]) -> None:
         digital_range = IntRange(*digital_range)

@@ -527,6 +527,55 @@ def test_edf_signal_update_data_keep_physical_range_raises_error_if_new_data_exc
         signal.update_data(np.array(data), keep_physical_range=True)
 
 
+def test_edf_signal_update_data_resampling():
+    signal = EdfSignal(np.arange(10), 10, digital_range=(0, 9), physical_range=(0, 9))
+    signal.update_data(
+        np.arange(0, 10, 2), sampling_frequency=5, keep_physical_range=True
+    )
+    assert signal.sampling_frequency == 5
+    np.testing.assert_array_equal(signal.data, np.arange(0, 10, 2))
+
+
+def test_edf_signal_update_data_resampling_noninteger_sampling_rates():
+    signal = EdfSignal(
+        np.arange(11), 5.5, digital_range=(0, 10), physical_range=(0, 10)
+    )
+    signal.update_data(np.arange(0, 10), sampling_frequency=5, keep_physical_range=True)
+    assert signal.sampling_frequency == 5
+    np.testing.assert_array_equal(signal.data, np.arange(0, 10))
+
+
+def test_edf_signal_update_data_resampling_invalid_duration():
+    signal = EdfSignal(np.arange(10), 10, digital_range=(0, 9), physical_range=(0, 9))
+    with pytest.raises(ValueError, match="Signal lengths must match:"):
+        signal.update_data(np.arange(0, 10, 2.5), sampling_frequency=5)
+
+
+@pytest.mark.parametrize(
+    "sampling_frequency",
+    [-10, 0],
+)
+def test_edf_signal_update_data_resampling_non_positive_sampling_frequency(
+    sampling_frequency: float,
+):
+    signal = EdfSignal(np.arange(10), 10, digital_range=(0, 9), physical_range=(0, 9))
+    with pytest.raises(ValueError, match="Sampling frequency must be positive"):
+        signal.update_data(np.arange(0, 10, 2), sampling_frequency=sampling_frequency)
+
+
+def test_edf_signal_update_data_resampling_non_integer_samples():
+    signal = EdfSignal(np.arange(10), 10, digital_range=(0, 9), physical_range=(0, 9))
+    with pytest.raises(ValueError, match="non-integer number of samples"):
+        signal.update_data(np.arange(0, 10, 2), sampling_frequency=9.8)
+
+
+def test_edf_signal_update_data_resampling_tolerance():
+    signal = EdfSignal(np.arange(1000000), 100)
+    signal.update_data(np.arange(1000001), sampling_frequency=100.0001)
+    assert signal.sampling_frequency == 100.0001
+    assert len(signal.data) == 1000001
+
+
 def test_edf_signal_data_cannot_be_modified(dummy_edf_signal: EdfSignal):
     with pytest.raises(ValueError, match="assignment destination is read-only"):
         dummy_edf_signal.data[5] = -1
