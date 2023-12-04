@@ -528,42 +528,27 @@ def test_edf_signal_update_data_keep_physical_range_raises_error_if_new_data_exc
 
 
 def test_edf_signal_update_data_resampling():
-    edf = Edf(
-        [
-            EdfSignal(np.arange(10), 10, digital_range=(0, 9), physical_range=(0, 9)),
-        ],
-    )
-    edf.signals[0].update_data(
+    signal = EdfSignal(np.arange(10), 10, digital_range=(0, 9), physical_range=(0, 9))
+    signal.update_data(
         np.arange(0, 10, 2), sampling_frequency=5, keep_physical_range=True
     )
-    assert edf.signals[0].sampling_frequency == 5
-    np.testing.assert_array_equal(edf.signals[0].data, np.arange(0, 10, 2))
+    assert signal.sampling_frequency == 5
+    np.testing.assert_array_equal(signal.data, np.arange(0, 10, 2))
 
 
 def test_edf_signal_update_data_resampling_noninteger_sampling_rates():
-    edf = Edf(
-        [
-            EdfSignal(
-                np.arange(11), 5.5, digital_range=(0, 10), physical_range=(0, 10)
-            ),
-        ],
-        data_record_duration=2,
+    signal = EdfSignal(
+        np.arange(11), 5.5, digital_range=(0, 10), physical_range=(0, 10)
     )
-    edf.signals[0].update_data(
-        np.arange(0, 10), sampling_frequency=5, keep_physical_range=True
-    )
-    assert edf.signals[0].sampling_frequency == 5
-    np.testing.assert_array_equal(edf.signals[0].data, np.arange(0, 10))
+    signal.update_data(np.arange(0, 10), sampling_frequency=5, keep_physical_range=True)
+    assert signal.sampling_frequency == 5
+    np.testing.assert_array_equal(signal.data, np.arange(0, 10))
 
 
 def test_edf_signal_update_data_resampling_invalid_duration():
-    edf = Edf(
-        [
-            EdfSignal(np.arange(10), 10, digital_range=(0, 9), physical_range=(0, 9)),
-        ],
-    )
+    signal = EdfSignal(np.arange(10), 10, digital_range=(0, 9), physical_range=(0, 9))
     with pytest.raises(ValueError, match="Signal lengths must match:"):
-        edf.signals[0].update_data(np.arange(0, 10, 2.5), sampling_frequency=5)
+        signal.update_data(np.arange(0, 10, 2.5), sampling_frequency=5)
 
 
 @pytest.mark.parametrize(
@@ -583,15 +568,9 @@ def test_edf_signal_update_data_resampling_invalid_duration():
 def test_edf_signal_update_data_resampling_invalid_sampling_frequency(
     sampling_frequency: float, expected_error: str
 ):
-    edf = Edf(
-        [
-            EdfSignal(np.arange(10), 10, digital_range=(0, 9), physical_range=(0, 9)),
-        ],
-    )
+    signal = EdfSignal(np.arange(10), 10, digital_range=(0, 9), physical_range=(0, 9))
     with pytest.raises(ValueError, match=expected_error):
-        edf.signals[0].update_data(
-            np.arange(0, 10, 2), sampling_frequency=sampling_frequency
-        )
+        signal.update_data(np.arange(0, 10, 2), sampling_frequency=sampling_frequency)
 
 
 def test_edf_signal_data_cannot_be_modified(dummy_edf_signal: EdfSignal):
