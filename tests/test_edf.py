@@ -287,7 +287,7 @@ def test_edf_init_all_parameters():
     assert edf.__starttime == b"16.13.00"
     assert edf._bytes_in_header_record == b"512".ljust(8)
     assert edf._reserved == b"".ljust(44)
-    assert edf._data_record_duration == b"2.5".ljust(8)
+    assert edf.__data_record_duration == b"2.5".ljust(8)
     assert edf._num_signals == b"1".ljust(4)
 
 

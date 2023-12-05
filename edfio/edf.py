@@ -636,7 +636,7 @@ class Edf:
     """`"EDF+C"` for an EDF+C file, else `""`."""
     num_data_records = RawHeaderFieldInt(8)
     """Number of data records in the recording."""
-    data_record_duration = RawHeaderFieldFloat(8)
+    _data_record_duration = RawHeaderFieldFloat(8, is_settable=True)
     """Duration of each data record in seconds."""
     num_signals = RawHeaderFieldInt(4)
     """Number of signals in the recording, including annotation signals for EDF+."""
@@ -662,9 +662,7 @@ class Edf:
         if data_record_duration is None:
             data_record_duration = _calculate_data_record_duration(signals)
 
-        self._data_record_duration = Edf.data_record_duration.encode(
-            data_record_duration
-        )
+        self._data_record_duration = data_record_duration
         self._set_num_data_records_with_signals(signals)
         self._version = Edf.version.encode(0)
         self.local_patient_identification = patient._to_str()
@@ -734,7 +732,7 @@ class Edf:
         )
         self._num_signals = Edf.num_signals.encode(len(signals))
         if all(s.label == "EDF Annotations" for s in signals):
-            self._data_record_duration = Edf.data_record_duration.encode(0)
+            self._data_record_duration = 0
 
     def _set_num_data_records_with_signals(
         self,
@@ -995,6 +993,11 @@ class Edf:
             self._startdate = recording.startdate
         except AnonymizedDateError:
             self._startdate = datetime.date(1985, 1, 1)
+
+    @property
+    def data_record_duration(self) -> float:
+        """Duration of each data record in seconds."""
+        return self._data_record_duration
 
     def anonymize(self) -> None:
         """
