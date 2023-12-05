@@ -471,7 +471,6 @@ def test_edf_get_signal_ambiguous_label():
         "bytes_in_header_record",
         "reserved",
         "num_data_records",
-        "data_record_duration",
         "num_signals",
     ],
 )
@@ -1165,3 +1164,84 @@ def test_append_signals_raises_error_for_signals_incompatible_with_the_data_reco
     edf = Edf([EdfSignal(np.arange(100), 5)], data_record_duration=0.2)
     with pytest.raises(ValueError, match="Not all signal lengths can be split"):
         edf.append_signals([EdfSignal(np.arange(length), sampling_frequency)])
+
+
+def test_update_record_duration():
+    edf = Edf([EdfSignal(np.arange(100), 10)])
+    edf.update_data_record_duration(0.1)
+    assert edf.data_record_duration == 0.1
+    assert edf.num_data_records == 100
+
+
+def test_update_record_duration_method_pad_with_zero():
+    edf = Edf(
+        [EdfSignal(np.arange(100), 10, physical_range=(0, 99), digital_range=(-50, 49))]
+    )
+    edf.update_data_record_duration(0.3, method="pad")
+    assert edf.data_record_duration == 0.3
+    assert edf.num_data_records == 34
+    assert edf.duration == 10.2
+    np.testing.assert_array_equal(
+        edf.signals[0].data,
+        np.concatenate(
+            [
+                np.arange(100),
+                np.zeros(2),
+            ]
+        ),
+    )
+
+
+def test_update_record_duration_method_pad_with_physical_minimum():
+    edf = Edf(
+        [
+            EdfSignal(
+                np.arange(5, 105), 10, physical_range=(5, 104), digital_range=(-50, 49)
+            )
+        ]
+    )
+    edf.update_data_record_duration(0.3, method="pad")
+    assert edf.data_record_duration == 0.3
+    assert edf.num_data_records == 34
+    assert edf.duration == 10.2
+    np.testing.assert_array_equal(
+        edf.signals[0].data,
+        np.concatenate(
+            [
+                np.arange(5, 105),
+                np.ones(2) * 5,
+            ]
+        ),
+    )
+
+
+def test_update_record_duration_method_truncate():
+    edf = Edf(
+        [EdfSignal(np.arange(100), 10, physical_range=(0, 99), digital_range=(0, 99))]
+    )
+    edf.update_data_record_duration(0.3, method="truncate")
+    assert edf.data_record_duration == 0.3
+    assert edf.num_data_records == 33
+    assert edf.duration == 9.9
+    np.testing.assert_array_equal(
+        edf.signals[0].data,
+        np.arange(0, 99),
+    )
+
+
+def test_update_record_duration_raises_error_if_signal_duration_is_not_exactly_divisible():
+    edf = Edf([EdfSignal(np.arange(100), 10)])
+    with pytest.raises(
+        ValueError,
+        match="Signal duration of 10.0s is not exactly divisible by data_record_duration of 0.3s",
+    ):
+        edf.update_data_record_duration(0.3)
+
+
+def test_update_record_duration_raises_error_if_sampling_rate_incompatible():
+    edf = Edf([EdfSignal(np.arange(100), 10), EdfSignal(np.arange(100), 10)])
+    with pytest.raises(
+        ValueError,
+        match="Cannot set data record duration to 0.05: Incompatible sampling frequency 10.* Hz",
+    ):
+        edf.update_data_record_duration(0.05)

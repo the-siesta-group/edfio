@@ -12,6 +12,7 @@ from dataclasses import dataclass
 from decimal import Decimal
 from fractions import Fraction
 from functools import singledispatch
+from math import ceil, floor
 from pathlib import Path
 from typing import Any, Literal, NamedTuple
 
@@ -998,6 +999,59 @@ class Edf:
     def data_record_duration(self) -> float:
         """Duration of each data record in seconds."""
         return self._data_record_duration
+
+    def update_data_record_duration(
+        self,
+        data_record_duration: float,
+        method: Literal["strict", "pad", "truncate"] = "strict",
+    ) -> None:
+        """
+        Update the data record duration.
+
+        This operation will fail if the new duration is incompatible with the current sampling frequencies.
+
+        Parameters
+        ----------
+        data_record_duration : float
+            The new data record duration in seconds.
+        method : Literal["strict", "pad", "truncate"], default: "strict"
+            How to handle the case where the new duration does not divide the Edf duration evenly:
+            - "strict": Raise a ValueError
+            - "pad": Pad the data with zeros to the next compatible duration
+            - "truncate": Truncate the data to the previous compatible duration (might lead to loss of data)
+        """
+        for signal in self.signals:
+            spr = signal.sampling_frequency * data_record_duration
+            if spr % 1:
+                raise ValueError(
+                    f"Cannot set data record duration to {data_record_duration}: Incompatible sampling frequency {signal.sampling_frequency} Hz"
+                )
+        if method == "pad":
+            new_duration = (
+                ceil(self.duration / data_record_duration) * data_record_duration
+            )
+            self._pad_or_truncate_data(new_duration)
+        elif method == "truncate":
+            new_duration = (
+                floor(self.duration / data_record_duration) * data_record_duration
+            )
+            self._pad_or_truncate_data(new_duration)
+        self._data_record_duration = data_record_duration
+        self._set_num_data_records_with_signals(self.signals)
+
+    def _pad_or_truncate_data(self, new_duration: float) -> None:
+        for signal in self.signals:
+            n_samples = round(new_duration * signal.sampling_frequency)
+            diff = n_samples - len(signal._digital)
+            if diff > 0:
+                physical_pad_value = (
+                    signal.physical_min if signal.physical_min > 0 else 0.0
+                )
+                signal._set_data(
+                    np.pad(signal.data, (0, diff), constant_values=physical_pad_value)
+                )
+            elif diff < 0:
+                signal._set_data(signal.data[:diff])
 
     def anonymize(self) -> None:
         """
