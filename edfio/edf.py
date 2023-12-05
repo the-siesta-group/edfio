@@ -638,7 +638,6 @@ class Edf:
     num_data_records = RawHeaderFieldInt(8)
     """Number of data records in the recording."""
     _data_record_duration = RawHeaderFieldFloat(8, is_settable=True)
-    """Duration of each data record in seconds."""
     num_signals = RawHeaderFieldInt(4)
     """Number of signals in the recording, including annotation signals for EDF+."""
 
