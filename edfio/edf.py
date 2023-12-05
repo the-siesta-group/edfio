@@ -1008,17 +1008,21 @@ class Edf:
         """
         Update the data record duration.
 
-        This operation will fail if the new duration is incompatible with the current sampling frequencies.
+        This operation will fail if the new duration is incompatible with the current
+        sampling frequencies.
 
         Parameters
         ----------
         data_record_duration : float
             The new data record duration in seconds.
-        method : Literal["strict", "pad", "truncate"], default: "strict"
-            How to handle the case where the new duration does not divide the Edf duration evenly:
+        method : `{"strict", "pad", "truncate"}`, default: `"strict"`
+            How to handle the case where the new duration does not divide the Edf
+            duration evenly
+
             - "strict": Raise a ValueError
             - "pad": Pad the data with zeros to the next compatible duration
-            - "truncate": Truncate the data to the previous compatible duration (might lead to loss of data)
+            - "truncate": Truncate the data to the previous compatible duration (might
+              lead to loss of data)
         """
         for signal in self.signals:
             spr = signal.sampling_frequency * data_record_duration
