@@ -1028,6 +1028,14 @@ class Edf:
             - "truncate": Truncate the data to the previous compatible duration (might
               lead to loss of data)
         """
+        if data_record_duration == self.data_record_duration:
+            return
+        if not any(
+            signal for signal in self.signals if signal not in self._annotation_signals
+        ):
+            raise ValueError(
+                "Data record duration must be zero for annotation-only files"
+            )
         for signal in self.signals:
             if signal in self._annotation_signals:
                 continue
@@ -1040,17 +1048,6 @@ class Edf:
                 raise ValueError(
                     f"Cannot set data record duration to {data_record_duration}: Incompatible sampling frequency {signal.sampling_frequency} Hz"
                 )
-        if (
-            not any(
-                signal
-                for signal in self.signals
-                if signal not in self._annotation_signals
-            )
-            and data_record_duration != 0
-        ):
-            raise ValueError(
-                "Data record duration must be zero for annotation-only files"
-            )
 
         num_data_records = self._pad_or_truncate_signals(data_record_duration, method)
         self._update_record_duration_in_annotation_signals(
@@ -1062,10 +1059,6 @@ class Edf:
     def _pad_or_truncate_signals(
         self, data_record_duration: float, method: Literal["strict", "pad", "truncate"]
     ) -> int:
-        if not any(
-            signal for signal in self.signals if signal not in self._annotation_signals
-        ):
-            return 1
         if method == "pad":
             new_duration = (
                 ceil(self.duration / data_record_duration) * data_record_duration

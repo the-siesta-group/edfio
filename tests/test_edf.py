@@ -1331,6 +1331,19 @@ def test_update_data_record_duration_annotations_only_raises_error_if_data_recor
         edf.update_data_record_duration(0.3)
 
 
+def test_update_data_record_duration_annotations_only(tmp_path: Path):
+    test_file = tmp_path / "test.edf"
+    edf = Edf(
+        [],
+        annotations=(EdfAnnotation(0, None, "ann 1"),),
+    )
+    edf.update_data_record_duration(0.0)
+    edf.write(test_file)
+    edf = read_edf(test_file)
+    assert edf.data_record_duration == 0.0
+    assert edf.num_data_records == 1
+
+
 @pytest.mark.parametrize(
     ("method", "expected_num_records"), [("pad", 14), ("truncate", 13)]
 )
