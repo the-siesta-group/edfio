@@ -5,6 +5,7 @@ import io
 import json
 import re
 from pathlib import Path
+from typing import Literal
 
 import numpy as np
 import pytest
@@ -1070,6 +1071,11 @@ def test_edf_with_only_annotations_can_be_written(tmp_file: Path):
     assert edf.annotations == annotations
 
 
+def test_edf_with_only_annotations_nonzero_data_record_duration():
+    with pytest.raises(ValueError, match="Data record duration must be zero"):
+        Edf([], annotations=(EdfAnnotation(0, 10, "ann 1"),), data_record_duration=20)
+
+
 def test_edf_without_signals_or_annotations_cannot_be_created():
     with pytest.raises(ValueError, match="must contain either signals or annotations"):
         Edf([])
@@ -1166,14 +1172,14 @@ def test_append_signals_raises_error_for_signals_incompatible_with_the_data_reco
         edf.append_signals([EdfSignal(np.arange(length), sampling_frequency)])
 
 
-def test_update_record_duration():
+def test_update_data_record_duration():
     edf = Edf([EdfSignal(np.arange(100), 10)])
     edf.update_data_record_duration(0.1)
     assert edf.data_record_duration == 0.1
     assert edf.num_data_records == 100
 
 
-def test_update_record_duration_method_pad_with_zero():
+def test_update_data_record_duration_method_pad_with_zero():
     edf = Edf(
         [EdfSignal(np.arange(100), 10, physical_range=(0, 99), digital_range=(-50, 49))]
     )
@@ -1192,11 +1198,15 @@ def test_update_record_duration_method_pad_with_zero():
     )
 
 
-def test_update_record_duration_method_pad_with_physical_minimum():
+@pytest.mark.parametrize("physical_range", [(5, 104), (-105, -6)])
+def test_update_data_record_duration_method_pad_with_physical_minimum(
+    physical_range: FloatRange,
+):
+    test_data = np.arange(physical_range[0], physical_range[1] + 1)
     edf = Edf(
         [
             EdfSignal(
-                np.arange(5, 105), 10, physical_range=(5, 104), digital_range=(-50, 49)
+                test_data, 10, physical_range=physical_range, digital_range=(-50, 49)
             )
         ]
     )
@@ -1208,14 +1218,14 @@ def test_update_record_duration_method_pad_with_physical_minimum():
         edf.signals[0].data,
         np.concatenate(
             [
-                np.arange(5, 105),
-                np.ones(2) * 5,
+                test_data,
+                np.ones(2) * physical_range[0],
             ]
         ),
     )
 
 
-def test_update_record_duration_method_truncate():
+def test_update_data_record_duration_method_truncate():
     edf = Edf(
         [EdfSignal(np.arange(100), 10, physical_range=(0, 99), digital_range=(0, 99))]
     )
@@ -1229,7 +1239,7 @@ def test_update_record_duration_method_truncate():
     )
 
 
-def test_update_record_duration_raises_error_if_signal_duration_is_not_exactly_divisible():
+def test_update_data_record_duration_raises_error_if_signal_duration_is_not_exactly_divisible():
     edf = Edf([EdfSignal(np.arange(100), 10)])
     with pytest.raises(
         ValueError,
@@ -1238,10 +1248,129 @@ def test_update_record_duration_raises_error_if_signal_duration_is_not_exactly_d
         edf.update_data_record_duration(0.3)
 
 
-def test_update_record_duration_raises_error_if_sampling_rate_incompatible():
+def test_update_data_record_duration_raises_error_if_sampling_rate_incompatible():
     edf = Edf([EdfSignal(np.arange(100), 10), EdfSignal(np.arange(100), 10)])
     with pytest.raises(
         ValueError,
         match="Cannot set data record duration to 0.05: Incompatible sampling frequency 10.* Hz",
     ):
         edf.update_data_record_duration(0.05)
+
+
+@pytest.mark.parametrize("record_duration", [0, -1])
+def test_update_data_record_duration_raises_error_if_data_record_duration_not_positive(
+    record_duration: float,
+):
+    edf = Edf([EdfSignal(np.arange(100), 10)])
+    with pytest.raises(ValueError, match="Data record duration must be positive"):
+        edf.update_data_record_duration(record_duration)
+
+
+def test_update_data_record_duration_with_annotations(tmp_path: Path):
+    edf_file = tmp_path / "test.edf"
+    expected_data = np.arange(30)
+    expected_annotations = (
+        EdfAnnotation(0, None, "ann 1"),
+        EdfAnnotation(10, None, "ann 2"),
+        EdfAnnotation(20, None, "ann 3"),
+    )
+    edf = Edf(
+        [EdfSignal(expected_data, 10, physical_range=(0, 29), digital_range=(0, 29))],
+        annotations=expected_annotations,
+    )
+    edf.update_data_record_duration(0.3)
+    edf.write(edf_file)
+    edf = read_edf(edf_file)
+    assert edf.data_record_duration == 0.3
+    assert edf.num_data_records == 10
+    np.testing.assert_array_equal(edf.signals[0].data, expected_data)
+    assert edf.annotations == expected_annotations
+
+
+def test_update_data_record_duration_with_multiple_annotations_signals(tmp_path: Path):
+    edf_file = tmp_path / "test.edf"
+    expected_data = np.arange(30)
+    expected_annotations1 = (
+        EdfAnnotation(0, None, "ann 1"),
+        EdfAnnotation(10, None, "ann 2"),
+    )
+    expected_annotations2 = (EdfAnnotation(20, None, "ann 3"),)
+    edf = Edf(
+        [
+            EdfSignal(expected_data, 10, physical_range=(0, 29), digital_range=(0, 29)),
+            _create_annotations_signal(
+                expected_annotations1,
+                data_record_duration=1,
+                num_data_records=3,
+                with_timestamps=True,
+            ),
+            _create_annotations_signal(
+                expected_annotations2,
+                data_record_duration=1,
+                num_data_records=3,
+                with_timestamps=False,
+            ),
+        ],
+        data_record_duration=1,
+    )
+    edf.update_data_record_duration(0.3)
+    edf.write(edf_file)
+    edf = read_edf(edf_file)
+    assert edf.data_record_duration == 0.3
+    assert edf.num_data_records == 10
+    np.testing.assert_array_equal(edf.signals[0].data, expected_data)
+    assert edf.annotations == expected_annotations1 + expected_annotations2
+
+
+def test_update_data_record_duration_annotations_only_raises_error_if_data_record_duration_not_zero():
+    edf = Edf(
+        [],
+        annotations=(EdfAnnotation(0, None, "ann 1"),),
+    )
+    with pytest.raises(ValueError, match="Data record duration must be zero"):
+        edf.update_data_record_duration(0.3)
+
+
+@pytest.mark.parametrize(
+    ("method", "expected_num_records"), [("pad", 14), ("truncate", 13)]
+)
+def test_update_data_record_duration_pad_or_truncate_with_annotations(
+    method: Literal["pad", "truncate"], expected_num_records: int, tmp_path: Path
+):
+    test_file = tmp_path / "test.edf"
+    expected_data = np.arange(40)
+    expected_annotations = (
+        EdfAnnotation(0, 5, "ann 1"),
+        EdfAnnotation(10, 4, "ann 2"),
+        EdfAnnotation(20, 10, "ann 3"),
+    )
+    edf = Edf(
+        [EdfSignal(expected_data, 10, physical_range=(0, 39), digital_range=(0, 39))],
+        annotations=expected_annotations,
+    )
+    edf.update_data_record_duration(0.3, method=method)
+    edf.write(test_file)
+    edf = read_edf(test_file)
+    assert edf.data_record_duration == 0.3
+    assert edf.num_data_records == expected_num_records
+    assert edf.duration == expected_num_records * 0.3
+    assert edf.annotations == expected_annotations
+
+
+def test_update_data_record_duration_with_subsecond_offset(tmp_path: Path):
+    test_file = tmp_path / "test.edf"
+    expected_annotations = (EdfAnnotation(5, 5, "ann 1"),)
+    microseconds_offset = 153781
+    edf = Edf(
+        [EdfSignal(np.arange(100), 10, physical_range=(0, 99), digital_range=(0, 99))],
+        annotations=expected_annotations,
+        starttime=datetime.time(0, 0, 0, microseconds_offset),
+    )
+    edf.update_data_record_duration(2.5)
+    edf.write(test_file)
+    edf = read_edf(test_file)
+    assert edf.data_record_duration == 2.5
+    assert edf.num_data_records == 4
+    assert edf.duration == 10
+    assert edf.annotations == expected_annotations
+    assert edf.starttime.microsecond == microseconds_offset

@@ -661,6 +661,10 @@ class Edf:
             starttime = datetime.time(0, 0, 0)
         if data_record_duration is None:
             data_record_duration = _calculate_data_record_duration(signals)
+        elif len(signals) == 0 and data_record_duration != 0:
+            raise ValueError(
+                "Data record duration must be zero for annotation-only files"
+            )
 
         self._data_record_duration = data_record_duration
         self._set_num_data_records_with_signals(signals)
@@ -1019,37 +1023,106 @@ class Edf:
             duration evenly
 
             - "strict": Raise a ValueError
-            - "pad": Pad the data with zeros to the next compatible duration
+            - "pad": Pad the data with zeros to the next compatible duration. If zero
+               is outside the physical range, data is padded with the physical minimum.
             - "truncate": Truncate the data to the previous compatible duration (might
               lead to loss of data)
         """
         for signal in self.signals:
+            if signal in self._annotation_signals:
+                continue
             spr = signal.sampling_frequency * data_record_duration
+            if spr <= 0:
+                raise ValueError(
+                    f"Data record duration must be positive, got {data_record_duration}"
+                )
             if spr % 1:
                 raise ValueError(
                     f"Cannot set data record duration to {data_record_duration}: Incompatible sampling frequency {signal.sampling_frequency} Hz"
                 )
+        if (
+            not any(
+                signal
+                for signal in self.signals
+                if signal not in self._annotation_signals
+            )
+            and data_record_duration != 0
+        ):
+            raise ValueError(
+                "Data record duration must be zero for annotation-only files"
+            )
+
+        num_data_records = self._pad_or_truncate_signals(data_record_duration, method)
+        self._update_record_duration_in_annotation_signals(
+            data_record_duration, num_data_records
+        )
+        self._data_record_duration = data_record_duration
+        self._num_data_records = Edf.num_data_records.encode(num_data_records)
+
+    def _pad_or_truncate_signals(
+        self, data_record_duration: float, method: Literal["strict", "pad", "truncate"]
+    ) -> int:
+        if not any(
+            signal for signal in self.signals if signal not in self._annotation_signals
+        ):
+            return 1
         if method == "pad":
             new_duration = (
                 ceil(self.duration / data_record_duration) * data_record_duration
             )
             self._pad_or_truncate_data(new_duration)
-        elif method == "truncate":
+            return round(new_duration / data_record_duration)
+        if method == "truncate":
             new_duration = (
                 floor(self.duration / data_record_duration) * data_record_duration
             )
             self._pad_or_truncate_data(new_duration)
-        self._data_record_duration = data_record_duration
-        self._set_num_data_records_with_signals(self.signals)
+            return round(new_duration / data_record_duration)
+        return _calculate_num_data_records(self.duration, data_record_duration)
+
+    def _update_record_duration_in_annotation_signals(
+        self, data_record_duration: float, num_data_records: int
+    ) -> None:
+        first_annotation_signal = True
+        for idx, signal in enumerate(self._signals):
+            if signal not in self._annotation_signals:
+                continue
+            annotations = []
+            for data_record in signal._digital.reshape(
+                (-1, signal.samples_per_data_record)
+            ):
+                annot_dr = _EdfAnnotationsDataRecord.from_bytes(data_record.tobytes())
+                if first_annotation_signal:
+                    annotations.extend(annot_dr.annotations[1:])
+                else:
+                    annotations.extend(annot_dr.annotations)
+            new_signal = _create_annotations_signal(
+                [
+                    EdfAnnotation(a.onset - self._subsecond_offset, a.duration, a.text)
+                    for a in annotations
+                ],
+                num_data_records=num_data_records,
+                data_record_duration=data_record_duration,
+                with_timestamps=signal is self._timekeeping_signal,
+                subsecond_offset=self._subsecond_offset,
+            )
+            self._signals = (
+                *self._signals[:idx],
+                new_signal,
+                *self._signals[idx + 1 :],
+            )
+            first_annotation_signal = False
 
     def _pad_or_truncate_data(self, new_duration: float) -> None:
         for signal in self.signals:
+            if signal in self._annotation_signals:
+                continue
             n_samples = round(new_duration * signal.sampling_frequency)
             diff = n_samples - len(signal._digital)
             if diff > 0:
-                physical_pad_value = (
-                    signal.physical_min if signal.physical_min > 0 else 0.0
-                )
+                physical_pad_value = 0.0
+                if signal.physical_min > 0 or signal.physical_max < 0:
+                    physical_pad_value = signal.physical_min
                 signal._set_data(
                     np.pad(signal.data, (0, diff), constant_values=physical_pad_value)
                 )
@@ -1405,9 +1478,10 @@ def _create_annotations_signal(
     if maxlen % 2:
         maxlen += 1
     raw = b"".join(dr.ljust(maxlen, b"\x00") for dr in data_records)
+    divisor = data_record_duration if data_record_duration else 1
     signal = EdfSignal(
         np.arange(1.0),  # placeholder signal, as argument `data` is non-optional
-        sampling_frequency=maxlen // 2 / data_record_duration,
+        sampling_frequency=maxlen // 2 / divisor,
         label="EDF Annotations",
         physical_range=(-32768, 32767),
     )
