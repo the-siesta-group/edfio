@@ -1,6 +1,9 @@
 # Changelog
 
 ## [Unreleased]
+
+## [0.3.1] - 2023-12-06
+
 ### Added
 - Add optional parameter `sampling_frequency` to `EdfSignal.update_data()` for changing the sampling frequency of the signal when updating its data ([#13](https://github.com/the-siesta-group/edfio/pull/13)).
 - Add `update_data_record_duration` method to class `Edf` for updating the `data_record_duration` field of the EDF header ([#14](https://github.com/the-siesta-group/edfio/pull/14)).
