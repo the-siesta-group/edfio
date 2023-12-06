@@ -1266,8 +1266,7 @@ def test_update_data_record_duration_raises_error_if_data_record_duration_not_po
         edf.update_data_record_duration(record_duration)
 
 
-def test_update_data_record_duration_with_annotations(tmp_path: Path):
-    edf_file = tmp_path / "test.edf"
+def test_update_data_record_duration_with_annotations(tmp_file: Path):
     expected_data = np.arange(30)
     expected_annotations = (
         EdfAnnotation(0, None, "ann 1"),
@@ -1279,16 +1278,15 @@ def test_update_data_record_duration_with_annotations(tmp_path: Path):
         annotations=expected_annotations,
     )
     edf.update_data_record_duration(0.3)
-    edf.write(edf_file)
-    edf = read_edf(edf_file)
+    edf.write(tmp_file)
+    edf = read_edf(tmp_file)
     assert edf.data_record_duration == 0.3
     assert edf.num_data_records == 10
     np.testing.assert_array_equal(edf.signals[0].data, expected_data)
     assert edf.annotations == expected_annotations
 
 
-def test_update_data_record_duration_with_multiple_annotations_signals(tmp_path: Path):
-    edf_file = tmp_path / "test.edf"
+def test_update_data_record_duration_with_multiple_annotations_signals(tmp_file: Path):
     expected_data = np.arange(30)
     expected_annotations1 = (
         EdfAnnotation(0, None, "ann 1"),
@@ -1314,8 +1312,8 @@ def test_update_data_record_duration_with_multiple_annotations_signals(tmp_path:
         data_record_duration=1,
     )
     edf.update_data_record_duration(0.3)
-    edf.write(edf_file)
-    edf = read_edf(edf_file)
+    edf.write(tmp_file)
+    edf = read_edf(tmp_file)
     assert edf.data_record_duration == 0.3
     assert edf.num_data_records == 10
     np.testing.assert_array_equal(edf.signals[0].data, expected_data)
@@ -1331,15 +1329,14 @@ def test_update_data_record_duration_annotations_only_raises_error_if_data_recor
         edf.update_data_record_duration(0.3)
 
 
-def test_update_data_record_duration_annotations_only(tmp_path: Path):
-    test_file = tmp_path / "test.edf"
+def test_update_data_record_duration_annotations_only(tmp_file: Path):
     edf = Edf(
         [],
         annotations=(EdfAnnotation(0, None, "ann 1"),),
     )
     edf.update_data_record_duration(0.0)
-    edf.write(test_file)
-    edf = read_edf(test_file)
+    edf.write(tmp_file)
+    edf = read_edf(tmp_file)
     assert edf.data_record_duration == 0.0
     assert edf.num_data_records == 1
 
@@ -1348,9 +1345,8 @@ def test_update_data_record_duration_annotations_only(tmp_path: Path):
     ("method", "expected_num_records"), [("pad", 14), ("truncate", 13)]
 )
 def test_update_data_record_duration_pad_or_truncate_with_annotations(
-    method: Literal["pad", "truncate"], expected_num_records: int, tmp_path: Path
+    method: Literal["pad", "truncate"], expected_num_records: int, tmp_file: Path
 ):
-    test_file = tmp_path / "test.edf"
     expected_data = np.arange(40)
     expected_annotations = (
         EdfAnnotation(0, 5, "ann 1"),
@@ -1362,16 +1358,15 @@ def test_update_data_record_duration_pad_or_truncate_with_annotations(
         annotations=expected_annotations,
     )
     edf.update_data_record_duration(0.3, method=method)
-    edf.write(test_file)
-    edf = read_edf(test_file)
+    edf.write(tmp_file)
+    edf = read_edf(tmp_file)
     assert edf.data_record_duration == 0.3
     assert edf.num_data_records == expected_num_records
     assert edf.duration == expected_num_records * 0.3
     assert edf.annotations == expected_annotations
 
 
-def test_update_data_record_duration_with_subsecond_offset(tmp_path: Path):
-    test_file = tmp_path / "test.edf"
+def test_update_data_record_duration_with_subsecond_offset(tmp_file: Path):
     expected_annotations = (EdfAnnotation(5, 5, "ann 1"),)
     microseconds_offset = 153781
     edf = Edf(
@@ -1380,8 +1375,8 @@ def test_update_data_record_duration_with_subsecond_offset(tmp_path: Path):
         starttime=datetime.time(0, 0, 0, microseconds_offset),
     )
     edf.update_data_record_duration(2.5)
-    edf.write(test_file)
-    edf = read_edf(test_file)
+    edf.write(tmp_file)
+    edf = read_edf(tmp_file)
     assert edf.data_record_duration == 2.5
     assert edf.num_data_records == 4
     assert edf.duration == 10
