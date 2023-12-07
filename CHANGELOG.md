@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+### Added
+- Add `Edf.ordinary_signals`, which returns a tuple containing all non-annotation signals ([#16](https://github.com/the-siesta-group/edfio/pull/16))
+
 ### Fixed
 - Avoid floating point errors sometimes preventing the creation of an Edf with signals that are actually compatible in duration ([#15](https://github.com/the-siesta-group/edfio/pull/15)).
 

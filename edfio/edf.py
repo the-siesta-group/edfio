@@ -1036,15 +1036,11 @@ class Edf:
             raise ValueError(
                 f"Data record duration must be positive, got {data_record_duration}"
             )
-        if not any(
-            signal for signal in self.signals if signal not in self._annotation_signals
-        ):
+        if not self.ordinary_signals:
             raise ValueError(
                 "Data record duration must be zero for annotation-only files"
             )
-        for signal in self.signals:
-            if signal in self._annotation_signals:
-                continue
+        for signal in self.ordinary_signals:
             spr = signal.sampling_frequency * data_record_duration
             if spr % 1:
                 raise ValueError(
@@ -1104,9 +1100,7 @@ class Edf:
         self._signals = tuple(signals)
 
     def _pad_or_truncate_data(self, new_duration: float) -> None:
-        for signal in self.signals:
-            if signal in self._annotation_signals:
-                continue
+        for signal in self.ordinary_signals:
             n_samples = round(new_duration * signal.sampling_frequency)
             diff = n_samples - len(signal._digital)
             if diff > 0:
@@ -1196,6 +1190,11 @@ class Edf:
     @property
     def _timekeeping_signal(self) -> EdfSignal:
         return next(iter(self._annotation_signals))
+
+    @property
+    def ordinary_signals(self) -> tuple[EdfSignal, ...]:
+        """All non-annotation signals contained in the recording."""
+        return tuple(s for s in self.signals if s.label != "EDF Annotations")
 
     @property
     def duration(self) -> float:

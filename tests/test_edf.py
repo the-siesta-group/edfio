@@ -1395,3 +1395,30 @@ def test_sampling_frequencies_leading_to_floating_point_issues_in_signal_duratio
     assert edf.num_data_records == 10
     assert edf.signals[0].samples_per_data_record == 22
     assert edf.signals[1].samples_per_data_record == 9
+
+
+def test_ordinary_signals():
+    edf = Edf(
+        [
+            EdfSignal(np.arange(10), 1, label="S1"),
+            _create_annotations_signal(
+                [EdfAnnotation(0, None, "ann 1")],
+                data_record_duration=1,
+                num_data_records=10,
+                with_timestamps=True,
+            ),
+            EdfSignal(np.arange(10), 1, label="S2"),
+            EdfSignal(np.arange(10), 1, label="S3"),
+            _create_annotations_signal(
+                [EdfAnnotation(0, None, "ann 2")],
+                data_record_duration=1,
+                num_data_records=10,
+                with_timestamps=False,
+            ),
+            EdfSignal(np.arange(10), 1, label="S4"),
+        ],
+        data_record_duration=1,
+    )
+    assert edf.labels == ("S1", "EDF Annotations", "S2", "S3", "EDF Annotations", "S4")
+    assert len(edf.ordinary_signals) == 4
+    assert [s.label for s in edf.ordinary_signals] == ["S1", "S2", "S3", "S4"]
