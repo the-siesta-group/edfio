@@ -1382,3 +1382,16 @@ def test_update_data_record_duration_with_subsecond_offset(tmp_file: Path):
     assert edf.duration == 10
     assert edf.annotations == expected_annotations
     assert edf.starttime.microsecond == microseconds_offset
+
+
+def test_sampling_frequencies_leading_to_floating_point_issues_in_signal_duration_calculation(
+    tmp_file: Path,
+):
+    Edf(
+        signals=[EdfSignal(np.arange(220), 22 / 9), EdfSignal(np.arange(90), 1)],
+        data_record_duration=9,
+    ).write(tmp_file)
+    edf = read_edf(tmp_file)
+    assert edf.num_data_records == 10
+    assert edf.signals[0].samples_per_data_record == 22
+    assert edf.signals[1].samples_per_data_record == 9

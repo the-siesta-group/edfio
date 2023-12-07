@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+### Fixed
+- Avoid floating point errors sometimes preventing the creation of an Edf with signals that are actually compatible in duration ([#15](https://github.com/the-siesta-group/edfio/pull/15)).
+
 ## [0.3.1] - 2023-12-06
 
 ### Added

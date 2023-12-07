@@ -745,7 +745,9 @@ class Edf:
         if not signals:
             num_data_records = 1
         else:
-            signal_durations = [len(s._digital) / s.sampling_frequency for s in signals]
+            signal_durations = [
+                round(len(s._digital) / s.sampling_frequency, 12) for s in signals
+            ]
             if any(v != signal_durations[0] for v in signal_durations[1:]):
                 raise ValueError(
                     f"Inconsistent signal durations (in seconds): {signal_durations}"
