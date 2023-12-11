@@ -25,7 +25,6 @@ def edf(patient, recording):
 
 LOCAL_RECORDING_IDENTIFICATION_WITH_INVALID_STARTDATE = [
     b"",
-    b"Startdate",
     b"xxx 01-JAN-2001 X X X",
     b"01-JAN-2001",
 ]
@@ -337,20 +336,50 @@ def test_edf_startdate_falls_back_to_legacy_field_if_recording_field_is_not_vali
 
 
 @pytest.mark.parametrize(
-    ("code", "name", "additional"),
+    ("code", "sex", "name", "additional"),
     [
-        ("", "X", ()),
-        ("X", "", ()),
-        ("X", "X", ("add1", "", "add2")),
+        ("", "X", "X", ()),
+        ("X", "", "", ()),
+        ("X", "X", "X", ("add1", "", "add2")),
+        (None, "X", "X", None),
+        ("X", None, None, None),
+        ("X", "X", "X", (None, "add2")),
     ],
 )
-def test_patient_raises_error_on_empty_subfields(
-    code: str,
-    name: str,
-    additional: tuple[str, ...],
+def test_patient_assumes_unspecified_subfields_as_unknown(
+    code: str | None,
+    sex: str | None,
+    name: str | None,
+    additional: tuple[str | None, ...] | None,
 ):
-    with pytest.raises(ValueError, match="must not be an empty string"):
-        Patient(code=code, name=name, additional=additional)
+    patient = Patient(code=code, sex=sex, name=name, additional=additional)
+    assert patient.code == code if code else "X"
+    assert patient.sex == sex if sex else "X"
+    assert patient.name == name if name else "X"
+    expected_additional = list(additional) if additional else []
+    for i in range(len(expected_additional)):
+        if expected_additional[i] is None or expected_additional[i] == "":
+            expected_additional[i] = "X"
+    assert patient.additional == tuple(expected_additional)
+
+
+def test_read_patient_all_subfields_missing():
+    patient = Patient._from_str("")
+    assert patient.code is None
+    assert patient.sex is None
+    assert patient.name is None
+    assert patient.additional == ()
+    with pytest.raises(AnonymizedDateError, match="birthdate is not available"):
+        patient.birthdate
+
+
+def test_read_patient_some_subfields_missing():
+    patient = Patient._from_str("X M 21-AUG-1984")
+    assert patient.code == "X"
+    assert patient.sex == "M"
+    assert patient.name is None
+    assert patient.birthdate == datetime.date(1984, 8, 21)
+    assert patient.additional == ()
 
 
 @pytest.mark.parametrize(
@@ -361,22 +390,71 @@ def test_patient_raises_error_on_empty_subfields(
         "additional",
     ),
     [
-        ("", "X", "X", ()),
-        ("X", "", "X", ()),
+        ("X", "X", "X", ()),
         ("X", "X", "", ()),
-        ("X", "X", "X", ("add1", "", "add2")),
+        ("X", "", "X", ()),
+        ("", "X", "X", ()),
+        ("X", "", "", ()),
+        ("", "X", "", ()),
+        ("", "", "X", ()),
+        ("", "", "", ()),
+        ("X", "X", None, None),
+        ("X", None, "X", None),
+        (None, "X", "X", None),
+        ("X", None, None, None),
+        (None, "X", None, None),
+        (None, None, "X", None),
+        (None, None, None, None),
+        ("X", "X", "X", ("add1", "add2")),
+        ("X", "X", "X", ("add1", "")),
+        ("X", "X", "X", (None, "add2")),
     ],
 )
-def test_recording_raises_error_on_empty_subfields(
-    hospital_administration_code: str,
-    investigator_technician_code: str,
-    equipment_code: str,
-    additional: tuple[str, ...],
+def test_recording_assumes_unspecified_subfields_as_unknown(
+    hospital_administration_code: str | None,
+    investigator_technician_code: str | None,
+    equipment_code: str | None,
+    additional: tuple[str | None, ...] | None,
 ):
-    with pytest.raises(ValueError, match="must not be an empty string"):
-        Recording(
-            hospital_administration_code=hospital_administration_code,
-            investigator_technician_code=investigator_technician_code,
-            equipment_code=equipment_code,
-            additional=additional,
-        )
+    recording = Recording(
+        startdate=datetime.date(2002, 3, 2),
+        hospital_administration_code=hospital_administration_code,
+        investigator_technician_code=investigator_technician_code,
+        equipment_code=equipment_code,
+        additional=additional,
+    )
+    assert (
+        recording.hospital_administration_code == hospital_administration_code
+        if hospital_administration_code
+        else "X"
+    )
+    assert (
+        recording.investigator_technician_code == investigator_technician_code
+        if investigator_technician_code
+        else "X"
+    )
+    assert recording.equipment_code == equipment_code if equipment_code else "X"
+    expected_additional = list(additional) if additional else []
+    for i in range(len(expected_additional)):
+        if expected_additional[i] is None or expected_additional[i] == "":
+            expected_additional[i] = "X"
+    assert recording.additional == tuple(expected_additional)
+
+
+def test_read_recording_all_subfields_missing():
+    recording = Recording._from_str("Startdate")
+    assert recording.hospital_administration_code is None
+    assert recording.investigator_technician_code is None
+    assert recording.equipment_code is None
+    assert recording.additional == ()
+    with pytest.raises(AnonymizedDateError, match="startdate is not available"):
+        recording.startdate
+
+
+def test_read_recording_some_subfields_missing():
+    recording = Recording._from_str("Startdate 13-MAY-2025 X")
+    assert recording.hospital_administration_code == "X"
+    assert recording.investigator_technician_code is None
+    assert recording.equipment_code is None
+    assert recording.additional == ()
+    assert recording.startdate == datetime.date(2025, 5, 13)

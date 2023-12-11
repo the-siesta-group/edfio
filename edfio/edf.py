@@ -31,6 +31,7 @@ from edfio._header_field import (
 from edfio._utils import (
     FloatRange,
     IntRange,
+    _unknown_to_x,
     calculate_gain_and_offset,
     decode_edfplus_date,
     encode_annotation_duration,
@@ -415,24 +416,30 @@ class Patient:
     def __init__(
         self,
         *,
-        code: str = "X",
-        sex: Literal["F", "M", "X"] = "X",
+        code: str | None = "X",
+        sex: Literal["F", "M", "X"] | None = "X",
         birthdate: datetime.date | None = None,
-        name: str = "X",
-        additional: Sequence[str] = (),
+        name: str | None = "X",
+        additional: Sequence[str | None] | None = (),
     ) -> None:
-        if sex not in ("F", "M", "X"):
+        code = _unknown_to_x(code)
+        name = _unknown_to_x(name)
+        if not sex:
+            sex = "X"
+        elif sex not in ("F", "M", "X"):
             raise ValueError(f"Invalid sex: {sex}, must be one of F, M, X")
         if birthdate is None:
             birthdate_field = "X"
         else:
             birthdate_field = encode_edfplus_date(birthdate)
+        if additional is None:
+            additional = ()
         subfields = {
             "code": code,
             "sex": sex,
             "birthdate": birthdate_field,
             "name": name,
-            **{f"additional[{i}]": v for i, v in enumerate(additional)},
+            **{f"additional[{i}]": _unknown_to_x(v) for i, v in enumerate(additional)},
         }
         validate_subfields(subfields)
         local_patient_identification = " ".join(subfields.values())
@@ -456,32 +463,38 @@ class Patient:
         return self._local_patient_identification
 
     @property
-    def code(self) -> str:
+    def code(self) -> str | None:
         """The code by which the patient is known in the hospital administration."""
-        return self._local_patient_identification.split()[0]
+        return self._get_subfield(0)
 
     @property
-    def sex(self) -> str:
+    def sex(self) -> str | None:
         """Sex, `F` for female, `M` for male, `X` if anonymized."""
-        return self._local_patient_identification.split()[1]
+        return self._get_subfield(1)
 
     @property
     def birthdate(self) -> datetime.date:
         """Patient birthdate."""
-        birthdate_field = self._local_patient_identification.split()[2]
-        if birthdate_field == "X":
+        birthdate_field = self._get_subfield(2)
+        if birthdate_field == "X" or birthdate_field is None:
             raise AnonymizedDateError("Patient birthdate is not available ('X').")
         return decode_edfplus_date(birthdate_field)
 
     @property
-    def name(self) -> str:
+    def name(self) -> str | None:
         """The patient's name."""
-        return self._local_patient_identification.split()[3]
+        return self._get_subfield(3)
 
     @property
-    def additional(self) -> tuple[str, ...]:
+    def additional(self) -> tuple[str | None, ...]:
         """Optional additional subfields."""
         return tuple(self._local_patient_identification.split()[4:])
+
+    def _get_subfield(self, idx: int) -> str | None:
+        subfields = self._local_patient_identification.split()
+        if len(subfields) <= idx:
+            return None
+        return subfields[idx]
 
 
 class Recording:
@@ -512,21 +525,23 @@ class Recording:
         self,
         *,
         startdate: datetime.date | None = None,
-        hospital_administration_code: str = "X",
-        investigator_technician_code: str = "X",
-        equipment_code: str = "X",
-        additional: Sequence[str] = (),
+        hospital_administration_code: str | None = "X",
+        investigator_technician_code: str | None = "X",
+        equipment_code: str | None = "X",
+        additional: Sequence[str | None] | None = (),
     ) -> None:
         if startdate is None:
             startdate_field = "X"
         else:
             startdate_field = encode_edfplus_date(startdate)
+        if additional is None:
+            additional = ()
         subfields = {
             "startdate": startdate_field,
-            "hospital_administration_code": hospital_administration_code,
-            "investigator_technician_code": investigator_technician_code,
-            "equipment_code": equipment_code,
-            **{f"additional[{i}]": v for i, v in enumerate(additional)},
+            "hospital_administration_code": _unknown_to_x(hospital_administration_code),
+            "investigator_technician_code": _unknown_to_x(investigator_technician_code),
+            "equipment_code": _unknown_to_x(equipment_code),
+            **{f"additional[{i}]": _unknown_to_x(v) for i, v in enumerate(additional)},
         }
         validate_subfields(subfields)
         local_recording_identification = " ".join(("Startdate", *subfields.values()))
@@ -552,34 +567,40 @@ class Recording:
     @property
     def startdate(self) -> datetime.date:
         """The recording startdate."""
-        if not self._local_recording_identification.startswith("Startdate "):
+        if not self._local_recording_identification.startswith("Startdate"):
             raise ValueError(
                 f"Local recording identification field {self._local_recording_identification!r} does not follow EDF+ standard."
             )
-        startdate_field = self._local_recording_identification.split()[1]
-        if startdate_field == "X":
+        startdate_field = self._get_subfield(1)
+        if startdate_field == "X" or startdate_field is None:
             raise AnonymizedDateError("Recording startdate is not available ('X').")
         return decode_edfplus_date(startdate_field)
 
     @property
-    def hospital_administration_code(self) -> str:
+    def hospital_administration_code(self) -> str | None:
         """The hospital administration code of the investigation."""
-        return self._local_recording_identification.split()[2]
+        return self._get_subfield(2)
 
     @property
-    def investigator_technician_code(self) -> str:
+    def investigator_technician_code(self) -> str | None:
         """A code specifying the responsible investigator or technician."""
-        return self._local_recording_identification.split()[3]
+        return self._get_subfield(3)
 
     @property
-    def equipment_code(self) -> str:
+    def equipment_code(self) -> str | None:
         """A code specifying the used equipment."""
-        return self._local_recording_identification.split()[4]
+        return self._get_subfield(4)
 
     @property
-    def additional(self) -> tuple[str, ...]:
+    def additional(self) -> tuple[str | None, ...]:
         """Optional additional subfields."""
         return tuple(self._local_recording_identification.split()[5:])
+
+    def _get_subfield(self, idx: int) -> str | None:
+        subfields = self._local_recording_identification.split()
+        if len(subfields) <= idx:
+            return None
+        return subfields[idx]
 
 
 class Edf:
