@@ -396,19 +396,20 @@ class Patient:
 
     Parsing from/to the string containing the local_patient_identification header field
     is done according to the EDF+ specs. Subfields must be ASCII (32..126) and may not
-    contain spaces.
+    contain spaces. None values or empty strings are interpreted as unknown value and
+    encoded as `"X"`.
 
     Parameters
     ----------
-    code : str, default: `"X"`
+    code : str | None, default: `"X"`
         The code by which the patient is known in the hospital administration.
-    sex : `{"X", "F", "M"}`, default: `"X"`
+    sex : `{"X", "F", "M"}` | None, default: `"X"`
         Sex, `F` for female, `M` for male, `X` if anonymized.
     birthdate : datetime.date | None, default: None
         Patient birthdate, stored as `X` if `None`.
-    name : str, default: `"X"`
+    name : str | None, default: `"X"`
         The patient's name, stored as `X` if `None`.
-    additional : Sequence[str], default: `()`
+    additional : Sequence[str | None] | None, default: `()`
         Optional additional subfields. Will be stored in the header field separated by
         spaces.
     """
@@ -503,20 +504,21 @@ class Recording:
 
     Parsing from/to the string containing the local_recording_identification header
     field is done according to the EDF+ specs. Subfields must be ASCII (32..126) and may
-    not contain spaces.
+    not contain spaces. None values or empty strings are interpreted as unknown value and
+    encoded as `"X"`.
 
     Parameters
     ----------
     startdate : datetime.date | None, default: None
         The recording startdate.
-    hospital_administration_code : str, default: `"X"`
+    hospital_administration_code : str | None, default: `"X"`
         The hospital administration code of the investigation, e.g., EEG number or PSG
         number.
-    investigator_technician_code : str, default: `"X"`
+    investigator_technician_code : str | None, default: `"X"`
         A code specifying the responsible investigator or technician.
-    equipment_code : str, default: `"X"`
+    equipment_code : str | None, default: `"X"`
         A code specifying the used equipment.
-    additional : Sequence[str], default: `()`
+    additional : Sequence[str | None] | None, default: `()`
         Optional additional subfields. Will be stored in the header field separated by
         spaces.
     """

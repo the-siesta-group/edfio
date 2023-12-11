@@ -8,6 +8,9 @@
 ## [0.4.0] - 2023-12-22
 
 ### Changed
+- Make EDF+ header fields `Patient` and `Recording` more tolerant regarding non-compliant inputs. when created from scratch, empty strings or `None` are now converted to `"X"`. When read from a file, omitted subfields are returned as `None` instead of throwing an exception ([#18](https://github.com/the-siesta-group/edfio/pull/18)).
+
+### Changed
 - Exclude EDF+ annotation signals from `Edf.signals`, `Edf.num_signals`, and `Edf.drop_signals()` ([#25](https://github.com/the-siesta-group/edfio/pull/25)).
 - Provide more concise `__repr__` for `Edf` and `EdfSignal` ([#26](https://github.com/the-siesta-group/edfio/pull/26)).
 - `Edf.append_signals()` now inserts new signals after the last ordinary (i.e. non-annotation) signal ([#29](https://github.com/the-siesta-group/edfio/pull/29)).
