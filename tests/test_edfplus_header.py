@@ -64,6 +64,12 @@ def test_patient_birthdate_raises_error_if_not_available():
         patient.birthdate
 
 
+@pytest.mark.parametrize("birthdate", ["01-Nov-2023", "01-nov-2023", "01-noV-2023"])
+def test_patient_birthdate_incorrect_case(birthdate: str):
+    patient = Patient._from_str(f"X X {birthdate} X")
+    assert patient.birthdate == datetime.date(2023, 11, 1)
+
+
 def test_patient_allows_accessing_other_fields_if_birthdate_is_invalid():
     patient = Patient._from_str("X F 1-2-3 X")
     assert patient.sex == "F"
@@ -159,6 +165,12 @@ def test_recording_startdate_raises_error_on_invalid_recording_field(
     recording = Recording._from_str(local_recording_identification.decode())
     with pytest.raises(ValueError, match="does not follow EDF\\+ standard"):
         recording.startdate
+
+
+@pytest.mark.parametrize("startdate", ["01-Nov-2023", "01-nov-2023", "01-noV-2023"])
+def test_read_startdate_incorrect_case(startdate: str):
+    recording = Recording._from_str(f"Startdate {startdate} X X X")
+    assert recording.startdate == datetime.date(2023, 11, 1)
 
 
 def test_recording_allows_accessing_other_fields_if_startdate_is_invalid():

@@ -52,7 +52,7 @@ _MONTH_NAMES = (
 def decode_edfplus_date(date: str) -> datetime.date:
     day, month, year = date.split("-")
     try:
-        month_int = _MONTH_NAMES.index(month) + 1
+        month_int = _MONTH_NAMES.index(month.upper()) + 1
     except ValueError:
         raise ValueError(f"Invalid month: {month}, options: {_MONTH_NAMES}") from None
     return datetime.date(int(year), month_int, int(day))
