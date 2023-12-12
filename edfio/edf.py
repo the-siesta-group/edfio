@@ -836,7 +836,7 @@ class Edf:
             target.write(header_record)
             target.write(data_record.tobytes())
         else:
-            with target.open("wb") as file:
+            with target.expanduser().open("wb") as file:
                 file.write(header_record)
                 data_record.tofile(file)
 
