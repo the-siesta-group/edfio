@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+### Changed
+- Exclude EDF+ annotation signals from `Edf.signals`, `Edf.num_signals`, and `Edf.drop_signals()` ([#25](https://github.com/the-siesta-group/edfio/pull/25)).
+
 ### Fixed
 - Avoid floating point errors sometimes preventing the creation of an Edf with signals that are actually compatible in duration ([#15](https://github.com/the-siesta-group/edfio/pull/15)).
 - Allow reading EDF+ startdate and birthdate with non-uppercase month ([#19](https://github.com/the-siesta-group/edfio/pull/19)).
