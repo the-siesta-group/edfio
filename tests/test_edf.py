@@ -477,7 +477,7 @@ def test_edf_get_signal_ambiguous_label():
 )
 def test_edf_field_cannot_be_set_publicly(field_name: str):
     edf = read_edf(EDF_FILE)
-    with pytest.raises(AttributeError, match="can't set attribute"):
+    with pytest.raises(AttributeError, match="can't set attribute|has no setter"):
         setattr(edf, field_name, None)
 
 
