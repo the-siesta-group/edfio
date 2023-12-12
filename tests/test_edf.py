@@ -1091,26 +1091,35 @@ def test_get_starttime_from_file_with_reserved_field_indicating_edfplus_but_no_a
     assert read_edf(tmp_file).starttime == starttime
 
 
-@pytest.mark.parametrize("selection", [[1], ["EDF Annotations"]])
-def test_drop_signals_does_not_allow_dropping_timekeeping_signal(selection):
+def test_drop_signals_keeps_position_of_annotation_signals():
     edf = Edf(
         signals=[
-            EdfSignal(np.arange(2), sampling_frequency=1),
+            EdfSignal(np.arange(2), 1, label="EEG 1"),
+            EdfSignal(np.arange(2), 1, label="EEG 2"),
             _create_annotations_signal(
                 [EdfAnnotation(0, None, "ann 1")],
                 num_data_records=2,
                 data_record_duration=1,
             ),
+            EdfSignal(np.arange(2), 1, label="EEG 3"),
+            EdfSignal(np.arange(2), 1, label="EEG 4"),
             _create_annotations_signal(
                 [EdfAnnotation(0.25, None, "ann 2")],
                 num_data_records=2,
                 data_record_duration=1,
                 with_timestamps=False,
             ),
+            EdfSignal(np.arange(2), 1, label="EEG 5"),
         ],
     )
-    with pytest.raises(ValueError, match="Can not drop EDF\\+ timekeeping signal"):
-        edf.drop_signals(selection)
+    edf.drop_signals([0, 3])
+    assert edf.labels == ("EEG 2", "EEG 3", "EEG 5")
+    assert edf._signals[1].label == "EDF Annotations"
+    assert edf._signals[3].label == "EDF Annotations"
+    assert edf.annotations == (
+        EdfAnnotation(0, None, "ann 1"),
+        EdfAnnotation(0.25, None, "ann 2"),
+    )
 
 
 @pytest.mark.parametrize(
