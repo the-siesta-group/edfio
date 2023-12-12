@@ -289,7 +289,7 @@ def test_edf_init_all_parameters():
     assert edf._bytes_in_header_record == b"512".ljust(8)
     assert edf._reserved == b"".ljust(44)
     assert edf.__data_record_duration == b"2.5".ljust(8)
-    assert edf._num_signals == b"1".ljust(4)
+    assert edf.__num_signals == b"1".ljust(4)
 
 
 def test_edf_init_signals_with_different_durations():
@@ -1066,7 +1066,8 @@ def test_edf_with_only_annotations_can_be_written(tmp_file: Path):
     assert edf.bytes_in_header_record == 512
     assert edf.reserved == "EDF+C"
     assert edf.data_record_duration == 0
-    assert edf.num_signals == 1
+    assert edf.num_signals == 0
+    assert edf._num_signals == 1
     assert edf.num_data_records == 1
     assert edf.annotations == annotations
 

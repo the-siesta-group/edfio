@@ -132,7 +132,8 @@ def test_write_edf_with_annotations(tmp_file: Path):
     edf = read_edf(tmp_file)
     assert edf.annotations == annotations
     assert edf.reserved == "EDF+C"
-    assert edf.num_signals == 2
+    assert edf.num_signals == 1
+    assert edf._num_signals == 2
 
 
 def test_annotations_outside_recording_limits(tmp_file: Path):

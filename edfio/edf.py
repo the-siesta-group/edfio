@@ -638,8 +638,7 @@ class Edf:
     num_data_records = RawHeaderFieldInt(8)
     """Number of data records in the recording."""
     _data_record_duration = RawHeaderFieldFloat(8, is_settable=True)
-    num_signals = RawHeaderFieldInt(4)
-    """Number of signals in the recording, including annotation signals for EDF+."""
+    _num_signals = RawHeaderFieldInt(4, is_settable=True)
 
     def __init__(
         self,
@@ -714,7 +713,7 @@ class Edf:
     def _read_header(self, buffer: io.BufferedReader | io.BytesIO) -> None:
         for header_name, length in get_header_fields(Edf):
             setattr(self, "_" + header_name, buffer.read(length))
-        self._signals = self._parse_signal_headers(buffer.read(256 * self.num_signals))
+        self._signals = self._parse_signal_headers(buffer.read(256 * self._num_signals))
 
     @property
     def signals(self) -> tuple[EdfSignal, ...]:
@@ -734,7 +733,7 @@ class Edf:
         self._bytes_in_header_record = Edf.bytes_in_header_record.encode(
             256 * (len(signals) + 1)
         )
-        self._num_signals = Edf.num_signals.encode(len(signals))
+        self._num_signals = len(signals)
         if all(s.label == "EDF Annotations" for s in signals):
             self._data_record_duration = 0
 
@@ -767,14 +766,14 @@ class Edf:
         raw_headers_split: dict[str, list[bytes]] = {}
         start = 0
         for header_name, length in get_header_fields(EdfSignal):
-            end = start + length * self.num_signals
+            end = start + length * self._num_signals
             raw_header = raw_signal_headers[start:end]
             raw_headers_split[header_name] = [
                 raw_header[i : length + i] for i in range(0, len(raw_header), length)
             ]
             start = end
         signals = []
-        for i in range(self.num_signals):
+        for i in range(self._num_signals):
             raw_signal_header = {
                 key: raw_headers_split[key][i] for key in raw_headers_split
             }
@@ -1054,6 +1053,11 @@ class Edf:
         self._data_record_duration = data_record_duration
         self._num_data_records = Edf.num_data_records.encode(num_data_records)
 
+    @property
+    def num_signals(self) -> int:
+        """Return the number of signals, excluding annotation signals for EDF+."""
+        return len(self.signals)
+
     def _pad_or_truncate_signals(
         self, data_record_duration: float, method: Literal["strict", "pad", "truncate"]
     ) -> int:
@@ -1164,7 +1168,7 @@ class Edf:
         self._bytes_in_header_record = Edf.bytes_in_header_record.encode(
             256 * (len(selected) + 1)
         )
-        self._num_signals = Edf.num_signals.encode(len(selected))
+        self._num_signals = len(selected)
 
     def append_signals(self, new_signals: EdfSignal | Iterable[EdfSignal]) -> None:
         """
