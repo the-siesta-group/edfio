@@ -250,8 +250,8 @@ def test_edf_init_with_negative_data_record_duration():
 @pytest.mark.parametrize(
     ("signal", "expected"),
     [
-        (EdfSignal(np.arange(5), 1), "<EdfSignal (1Hz)>"),
-        (EdfSignal(np.arange(5), 1, label="ECG"), "<EdfSignal (1Hz, 'ECG')>"),
+        (EdfSignal(np.arange(5), 1), "<EdfSignal 1Hz>"),
+        (EdfSignal(np.arange(5), 1, label="ECG"), "<EdfSignal ECG 1Hz>"),
     ],
 )
 def test_edf_signal_repr(signal: EdfSignal, expected: str):
@@ -263,12 +263,12 @@ def test_edf_signal_repr(signal: EdfSignal, expected: str):
     [
         (
             Edf([EdfSignal(np.arange(5), 1)], annotations=[EdfAnnotation(0, 1, "A")]),
-            "<Edf (1 signal, 1 annotation)>",
+            "<Edf 1 signal 1 annotation>",
         ),
-        (Edf([EdfSignal(np.arange(5), 1)] * 2), "<Edf (2 signals, 0 annotations)>"),
+        (Edf([EdfSignal(np.arange(5), 1)] * 2), "<Edf 2 signals 0 annotations>"),
         (
             Edf([], annotations=[EdfAnnotation(0, 1, "A")] * 2),
-            "<Edf (0 signals, 2 annotations)>",
+            "<Edf 0 signals 2 annotations>",
         ),
     ],
 )

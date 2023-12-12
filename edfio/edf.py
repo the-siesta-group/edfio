@@ -161,8 +161,8 @@ class EdfSignal:
     def __repr__(self) -> str:
         info = f"{self.sampling_frequency}Hz"
         if self.label:
-            info += f", {self.label!r}"
-        return f"<EdfSignal ({info})>"
+            info = f"{self.label} " + info
+        return f"<EdfSignal {info}>"
 
     @classmethod
     def _from_raw_header(
@@ -698,7 +698,7 @@ class Edf:
         annotations_text = f"{len(self.annotations)} annotation"
         if len(self.annotations) != 1:
             annotations_text += "s"
-        return f"<Edf ({signals_text}, {annotations_text})>"
+        return f"<Edf {signals_text} {annotations_text}>"
 
     def _load_data(self, file: Path | io.BufferedReader | io.BytesIO) -> None:
         lens = [signal.samples_per_data_record for signal in self._signals]
