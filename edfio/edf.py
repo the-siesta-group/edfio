@@ -159,7 +159,7 @@ class EdfSignal:
         self._set_data(data)
 
     def __repr__(self) -> str:
-        info = f"{self.sampling_frequency}Hz"
+        info = f"{self.sampling_frequency:g}Hz"
         if self.label:
             info = f"{self.label} " + info
         return f"<EdfSignal {info}>"

@@ -252,6 +252,8 @@ def test_edf_init_with_negative_data_record_duration():
     [
         (EdfSignal(np.arange(5), 1), "<EdfSignal 1Hz>"),
         (EdfSignal(np.arange(5), 1, label="ECG"), "<EdfSignal ECG 1Hz>"),
+        (EdfSignal(np.arange(5), 256.0), "<EdfSignal 256Hz>"),
+        (EdfSignal(np.arange(5), 123.456), "<EdfSignal 123.456Hz>"),
     ],
 )
 def test_edf_signal_repr(signal: EdfSignal, expected: str):
