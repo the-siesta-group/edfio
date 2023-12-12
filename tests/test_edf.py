@@ -621,7 +621,7 @@ def test_read_edf_str():
 
 def test_read_edf_expanduser():
     with pytest.raises(FileNotFoundError, match="^[^~]*$"):
-        read_edf("~/test.edf")
+        read_edf("~/edfio_testfile_that_should_not_exist.edf")
 
 
 @pytest.mark.parametrize("mode", ["rb", "r+b"])
