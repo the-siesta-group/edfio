@@ -836,7 +836,7 @@ class Edf:
             target.write(header_record)
             target.write(data_record.tobytes())
         else:
-            with target.open("wb") as file:
+            with target.expanduser().open("wb") as file:
                 file.write(header_record)
                 data_record.tofile(file)
 
@@ -1564,6 +1564,7 @@ def _read_edf(edf_file: Any) -> Edf:
 @_read_edf.register
 def _(edf_file: Path) -> Edf:
     edf = object.__new__(Edf)
+    edf_file = edf_file.expanduser()
     with edf_file.open("rb") as file:
         edf._read_header(file)
     edf._load_data(edf_file)

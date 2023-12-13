@@ -619,6 +619,11 @@ def test_read_edf_str():
     assert read_edf(str(EDF_FILE)).num_signals == 7
 
 
+def test_read_edf_expanduser():
+    with pytest.raises(FileNotFoundError, match="^[^~]*$"):
+        read_edf("~/edfio_testfile_that_should_not_exist.edf")
+
+
 @pytest.mark.parametrize("mode", ["rb", "r+b"])
 def test_read_edf_file_object(mode):
     with EDF_FILE.open(mode) as edf_file:
