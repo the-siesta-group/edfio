@@ -5,7 +5,7 @@
 ### Changed
 - Exclude EDF+ annotation signals from `Edf.signals`, `Edf.num_signals`, and `Edf.drop_signals()` ([#25](https://github.com/the-siesta-group/edfio/pull/25)).
 - Provide more concise `__repr__` for `Edf` and `EdfSignal` ([#26](https://github.com/the-siesta-group/edfio/pull/26)).
-- `Edf.append_signals()` now inserts new signals after the last ordinary (i.e. non-annotation) signal ([#28](https://github.com/the-siesta-group/edfio/pull/28)).
+- `Edf.append_signals()` now inserts new signals after the last ordinary (i.e. non-annotation) signal ([#29](https://github.com/the-siesta-group/edfio/pull/29)).
 
 ### Fixed
 - Avoid floating point errors sometimes preventing the creation of an Edf with signals that are actually compatible in duration ([#15](https://github.com/the-siesta-group/edfio/pull/15)).
