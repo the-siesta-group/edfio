@@ -1171,6 +1171,30 @@ def test_append_signals_multiple():
         assert actual == expected
 
 
+def test_append_signals_appends_after_last_ordinary_signal():
+    edf = Edf(
+        [
+            EdfSignal(np.arange(3), 1, label="S1"),
+            EdfSignal(np.arange(3), 1, label="S2"),
+            _create_annotations_signal(
+                (), data_record_duration=1, num_data_records=3, with_timestamps=True
+            ),
+            EdfSignal(np.arange(3), 1, label="S3"),
+            _create_annotations_signal(
+                (), data_record_duration=1, num_data_records=3, with_timestamps=True
+            ),
+        ]
+    )
+    edf.append_signals(
+        [
+            EdfSignal(np.arange(3), 1, label="S4"),
+            EdfSignal(np.arange(3), 1, label="S5"),
+        ]
+    )
+    expected = ["S1", "S2", "EDF Annotations", "S3", "S4", "S5", "EDF Annotations"]
+    assert [s.label for s in edf._signals] == expected
+
+
 @pytest.mark.parametrize(
     ("length", "sampling_frequency"),
     [(1001, 10), (999, 10), (1000, 10.001), (1, 0.011)],
