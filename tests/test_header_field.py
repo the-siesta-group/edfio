@@ -2,6 +2,7 @@ import pytest
 
 from edfio._header_field import (
     RawHeaderFieldDate,
+    RawHeaderFieldTime,
     decode_float,
     decode_str,
     encode_float,
@@ -62,3 +63,8 @@ def test_date_decode_invalid_day():
 def test_date_decode_invalid_month():
     with pytest.raises(ValueError, match="month must be in 1..12"):
         RawHeaderFieldDate(8).decode(b"02.13.51")
+
+
+def test_time_decode_invalid_format():
+    with pytest.raises(ValueError, match="Invalid time for format"):
+        RawHeaderFieldTime(8).decode(b"02_08_51")
