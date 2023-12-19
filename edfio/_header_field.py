@@ -9,6 +9,19 @@ from typing import Any, Generic, TypeVar, overload
 
 T = TypeVar("T", str, int, float, datetime.date, datetime.time)
 
+_one_or_two_digits = "(\\d{1,2})"
+_separator = "[.:'\\-\\/]"
+DATE_OR_TIME_PATTERN = re.compile(
+    f"""
+        {_one_or_two_digits}  # day/hour
+        {_separator}
+        {_one_or_two_digits}  # month/minute
+        {_separator}
+        {_one_or_two_digits}  # year/second
+        """,
+    re.VERBOSE,
+)
+
 
 def encode_str(value: str, length: int) -> bytes:
     if len(value) > length:
@@ -116,20 +129,7 @@ class RawHeaderFieldDate(RawHeaderField[datetime.date]):
 
     def decode(self, field: bytes) -> datetime.date:
         date = decode_str(field)
-        one_or_two_digits = "(\\d{1,2})"
-        separator = "[.:'\\-\\/]"
-        pattern = re.compile(
-            f"""
-            {one_or_two_digits}  # day
-            {separator}
-            {one_or_two_digits}  # month
-            {separator}
-            {one_or_two_digits}  # year
-            """,
-            re.VERBOSE,
-        )
-        date = date.replace(" ", "")
-        match = re.fullmatch(pattern, date)
+        match = DATE_OR_TIME_PATTERN.fullmatch(date.replace(" ", ""))
         if match is None:
             raise ValueError(f"Invalid date for format DD.MM.YY: {date!r}")
         day, month, year = (int(g) for g in match.groups())
@@ -150,7 +150,11 @@ class RawHeaderFieldTime(RawHeaderField[datetime.time]):
         super().__init__(length, is_settable=is_settable)
 
     def decode(self, field: bytes) -> datetime.time:
-        hours, minutes, seconds = (int(n) for n in decode_str(field).split("."))
+        time = decode_str(field)
+        match = DATE_OR_TIME_PATTERN.fullmatch(time.replace(" ", ""))
+        if match is None:
+            raise ValueError(f"Invalid time for format hh.mm.ss: {time!r}")
+        hours, minutes, seconds = (int(g) for g in match.groups())
         return datetime.time(hours, minutes, seconds)
 
     def encode(self, value: datetime.time) -> bytes:

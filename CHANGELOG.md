@@ -16,6 +16,7 @@
 - Avoid floating point errors sometimes preventing the creation of an Edf with signals that are actually compatible in duration ([#15](https://github.com/the-siesta-group/edfio/pull/15)).
 - Allow reading EDF+ startdate and birthdate with non-uppercase month ([#19](https://github.com/the-siesta-group/edfio/pull/19)).
 - Disallow setting signal label to `"EDF Annotations"` ([#28](https://github.com/the-siesta-group/edfio/pull/28)).
+- Allow reading more non-standard starttime fields ([#30](https://github.com/the-siesta-group/edfio/pull/30)).
 
 ## [0.3.1] - 2023-12-06
 
