@@ -326,11 +326,7 @@ class EdfSignal:
         expected_length_f = (
             sampling_frequency / self._sampling_frequency * current_length
         )
-        relative_tolerance = 1e-10
-        if (
-            abs(expected_length_f - round(expected_length_f)) / expected_length_f
-            > relative_tolerance
-        ):
+        if not math.isclose(expected_length_f, round(expected_length_f), rel_tol=1e-10):
             raise ValueError(
                 f"Sampling frequency of {sampling_frequency} results in non-integer number of samples ({expected_length_f})"
             )
@@ -844,7 +840,7 @@ class Edf:
             target.write(header_record)
             target.write(data_record.tobytes())
         else:
-            with target.open("wb") as file:
+            with target.expanduser().open("wb") as file:
                 file.write(header_record)
                 data_record.tofile(file)
 
@@ -1568,6 +1564,7 @@ def _read_edf(edf_file: Any) -> Edf:
 @_read_edf.register
 def _(edf_file: Path) -> Edf:
     edf = object.__new__(Edf)
+    edf_file = edf_file.expanduser()
     with edf_file.open("rb") as file:
         edf._read_header(file)
     edf._load_data(edf_file)
