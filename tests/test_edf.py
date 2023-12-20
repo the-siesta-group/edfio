@@ -247,20 +247,35 @@ def test_edf_init_with_negative_data_record_duration():
         )
 
 
-def test_edf_signal_repr():
-    sig = EdfSignal(np.arange(5), 1)
-    assert (
-        repr(sig)
-        == "EdfSignal(data=array([0.        , 1.00001526, 2.00003052, 2.99998474, 4.        ]), sampling_frequency=1, label='', transducer_type='', physical_dimension='', physical_range=FloatRange(min=0.0, max=4.0), digital_range=IntRange(min=-32768, max=32767), prefiltering='')"
-    )
+@pytest.mark.parametrize(
+    ("signal", "expected"),
+    [
+        (EdfSignal(np.arange(5), 1), "<EdfSignal 1Hz>"),
+        (EdfSignal(np.arange(5), 1, label="ECG"), "<EdfSignal ECG 1Hz>"),
+        (EdfSignal(np.arange(5), 256.0), "<EdfSignal 256Hz>"),
+        (EdfSignal(np.arange(5), 123.456), "<EdfSignal 123.456Hz>"),
+    ],
+)
+def test_edf_signal_repr(signal: EdfSignal, expected: str):
+    assert repr(signal) == expected
 
 
-def test_edf_repr():
-    edf = Edf([EdfSignal(np.arange(5), 1)])
-    assert (
-        repr(edf)
-        == "Edf(signals=(EdfSignal(data=array([0.        , 1.00001526, 2.00003052, 2.99998474, 4.        ]), sampling_frequency=1, label='', transducer_type='', physical_dimension='', physical_range=FloatRange(min=0.0, max=4.0), digital_range=IntRange(min=-32768, max=32767), prefiltering=''),), patient='X X X X', recording='Startdate X X X X', starttime=datetime.time(0, 0), data_record_duration=1.0, annotations=())"
-    )
+@pytest.mark.parametrize(
+    ("edf", "expected"),
+    [
+        (
+            Edf([EdfSignal(np.arange(5), 1)], annotations=[EdfAnnotation(0, 1, "A")]),
+            "<Edf 1 signal 1 annotation>",
+        ),
+        (Edf([EdfSignal(np.arange(5), 1)] * 2), "<Edf 2 signals 0 annotations>"),
+        (
+            Edf([], annotations=[EdfAnnotation(0, 1, "A")] * 2),
+            "<Edf 0 signals 2 annotations>",
+        ),
+    ],
+)
+def test_edf_repr(edf: Edf, expected: str):
+    assert repr(edf) == expected
 
 
 def test_edf_init_all_parameters():
