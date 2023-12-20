@@ -573,7 +573,7 @@ class Recording:
             raise ValueError(
                 f"Local recording identification field {self._local_recording_identification!r} does not follow EDF+ standard."
             )
-        startdate_field = self._get_subfield(1)
+        startdate_field = self.get_subfield(1)
         if startdate_field == "X" or startdate_field is None:
             raise AnonymizedDateError("Recording startdate is not available ('X').")
         return decode_edfplus_date(startdate_field)
@@ -581,24 +581,39 @@ class Recording:
     @property
     def hospital_administration_code(self) -> str:
         """The hospital administration code of the investigation."""
-        return self._get_subfield(2)
+        return self.get_subfield(2)
 
     @property
     def investigator_technician_code(self) -> str:
         """A code specifying the responsible investigator or technician."""
-        return self._get_subfield(3)
+        return self.get_subfield(3)
 
     @property
     def equipment_code(self) -> str:
         """A code specifying the used equipment."""
-        return self._get_subfield(4)
+        return self.get_subfield(4)
 
     @property
     def additional(self) -> tuple[str, ...]:
         """Optional additional subfields."""
         return tuple(self._local_recording_identification.split()[5:])
 
-    def _get_subfield(self, idx: int) -> str:
+    def get_subfield(self, idx: int) -> str:
+        """
+        Access a subfield of the local recording identification field by index.
+
+        Parameters
+        ----------
+        idx : int
+            The index of the subfield to access. The first subfield (starting at
+            index 0) should always be "Startdate" according to the EDF+ spedification.
+
+        Returns
+        -------
+        str
+            The subfield at the specified index. If the index exceeds the actually
+            specified number of subfields, the return value is `"X"`.
+        """
         subfields = self._local_recording_identification.split()
         if len(subfields) <= idx:
             return "X"
