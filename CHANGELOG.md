@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+### Changed
+- Exclude EDF+ annotation signals from `Edf.signals`, `Edf.num_signals`, and `Edf.drop_signals()` ([#25](https://github.com/the-siesta-group/edfio/pull/25)).
+
 ### Added
 - Expand `~` (tilde) to the user's home directory in `edf_file` argument of `read_edf()` and `target` argument of `Edf.write()` ([#23](https://github.com/the-siesta-group/edfio/pull/23)).
 
