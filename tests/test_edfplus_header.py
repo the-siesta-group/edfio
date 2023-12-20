@@ -367,9 +367,9 @@ def test_patient_assumes_unspecified_subfields_as_unknown(
 
 def test_read_patient_all_subfields_missing():
     patient = Patient._from_str("")
-    assert patient.code is None
-    assert patient.sex is None
-    assert patient.name is None
+    assert patient.code == "X"
+    assert patient.sex == "X"
+    assert patient.name == "X"
     assert patient.additional == ()
     with pytest.raises(AnonymizedDateError, match="birthdate is not available"):
         patient.birthdate
@@ -379,7 +379,7 @@ def test_read_patient_some_subfields_missing():
     patient = Patient._from_str("X M 21-AUG-1984")
     assert patient.code == "X"
     assert patient.sex == "M"
-    assert patient.name is None
+    assert patient.name == "X"
     assert patient.birthdate == datetime.date(1984, 8, 21)
     assert patient.additional == ()
 
@@ -445,9 +445,9 @@ def test_recording_assumes_unspecified_subfields_as_unknown(
 
 def test_read_recording_all_subfields_missing():
     recording = Recording._from_str("Startdate")
-    assert recording.hospital_administration_code is None
-    assert recording.investigator_technician_code is None
-    assert recording.equipment_code is None
+    assert recording.hospital_administration_code == "X"
+    assert recording.investigator_technician_code == "X"
+    assert recording.equipment_code == "X"
     assert recording.additional == ()
     with pytest.raises(AnonymizedDateError, match="startdate is not available"):
         recording.startdate
@@ -456,7 +456,7 @@ def test_read_recording_all_subfields_missing():
 def test_read_recording_some_subfields_missing():
     recording = Recording._from_str("Startdate 13-MAY-2025 X")
     assert recording.hospital_administration_code == "X"
-    assert recording.investigator_technician_code is None
-    assert recording.equipment_code is None
+    assert recording.investigator_technician_code == "X"
+    assert recording.equipment_code == "X"
     assert recording.additional == ()
     assert recording.startdate == datetime.date(2025, 5, 13)

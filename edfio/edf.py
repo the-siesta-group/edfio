@@ -464,12 +464,12 @@ class Patient:
         return self._local_patient_identification
 
     @property
-    def code(self) -> str | None:
+    def code(self) -> str:
         """The code by which the patient is known in the hospital administration."""
         return self._get_subfield(0)
 
     @property
-    def sex(self) -> str | None:
+    def sex(self) -> str:
         """Sex, `F` for female, `M` for male, `X` if anonymized."""
         return self._get_subfield(1)
 
@@ -482,19 +482,19 @@ class Patient:
         return decode_edfplus_date(birthdate_field)
 
     @property
-    def name(self) -> str | None:
+    def name(self) -> str:
         """The patient's name."""
         return self._get_subfield(3)
 
     @property
-    def additional(self) -> tuple[str | None, ...]:
+    def additional(self) -> tuple[str, ...]:
         """Optional additional subfields."""
         return tuple(self._local_patient_identification.split()[4:])
 
-    def _get_subfield(self, idx: int) -> str | None:
+    def _get_subfield(self, idx: int) -> str:
         subfields = self._local_patient_identification.split()
         if len(subfields) <= idx:
-            return None
+            return "X"
         return subfields[idx]
 
 
@@ -579,29 +579,29 @@ class Recording:
         return decode_edfplus_date(startdate_field)
 
     @property
-    def hospital_administration_code(self) -> str | None:
+    def hospital_administration_code(self) -> str:
         """The hospital administration code of the investigation."""
         return self._get_subfield(2)
 
     @property
-    def investigator_technician_code(self) -> str | None:
+    def investigator_technician_code(self) -> str:
         """A code specifying the responsible investigator or technician."""
         return self._get_subfield(3)
 
     @property
-    def equipment_code(self) -> str | None:
+    def equipment_code(self) -> str:
         """A code specifying the used equipment."""
         return self._get_subfield(4)
 
     @property
-    def additional(self) -> tuple[str | None, ...]:
+    def additional(self) -> tuple[str, ...]:
         """Optional additional subfields."""
         return tuple(self._local_recording_identification.split()[5:])
 
-    def _get_subfield(self, idx: int) -> str | None:
+    def _get_subfield(self, idx: int) -> str:
         subfields = self._local_recording_identification.split()
         if len(subfields) <= idx:
-            return None
+            return "X"
         return subfields[idx]
 
 
