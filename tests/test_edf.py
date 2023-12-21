@@ -130,7 +130,7 @@ def test_edf_signal_field_cannot_be_set_publicly(field_name: str):
 
 
 EDFSIGNAL_SETTER_TEST_FIELDS = [
-    ("label", 16, "EEG FPz-Cz"),
+    ("_label", 16, "EEG FPz-Cz"),
     ("transducer_type", 80, "AgAgCl electrode"),
     ("physical_dimension", 8, "uV"),
     ("prefiltering", 80, "HP:0.1Hz LP:75Hz"),
@@ -336,7 +336,7 @@ def test_data_record_duration_does_not_exactly_divide_signal_duration(
 def test_edf_signal_from_raw_header_has_no_data_by_default():
     sig = EdfSignal._from_raw_header(
         20,
-        label=b"".ljust(16),
+        _label=b"".ljust(16),
         transducer_type=b"".ljust(80),
         physical_dimension=b"".ljust(8),
         physical_min=b"-500".ljust(8),
@@ -1425,3 +1425,13 @@ def test_sampling_frequencies_leading_to_floating_point_issues_in_signal_duratio
     assert edf.num_data_records == 10
     assert edf.signals[0].samples_per_data_record == 22
     assert edf.signals[1].samples_per_data_record == 9
+
+
+def test_edf_signal_init_does_not_accept_edf_annotations_as_label():
+    with pytest.raises(ValueError, match="must not be 'EDF Annotations'"):
+        EdfSignal(np.arange(2), 1, label="EDF Annotations")
+
+
+def test_edf_signal_label_cannot_be_set_to_edf_annotations():
+    with pytest.raises(ValueError, match="must not be 'EDF Annotations'"):
+        EdfSignal(np.arange(2), 1).label = "EDF Annotations"

@@ -108,8 +108,7 @@ class EdfSignal:
         The signal prefiltering, e.g., `"HP:0.1Hz LP:75Hz"`.
     """
 
-    label = RawHeaderFieldStr(16, is_settable=True)
-    """Signal label, e.g., `"EEG Fpz-Cz"` or `"Body temp"`."""
+    _label = RawHeaderFieldStr(16, is_settable=True)
     transducer_type = RawHeaderFieldStr(80, is_settable=True)
     """Transducer type, e.g., `"AgAgCl electrode"`."""
     physical_dimension = RawHeaderFieldStr(8, is_settable=True)
@@ -169,7 +168,7 @@ class EdfSignal:
         cls,
         sampling_frequency: float,
         *,
-        label: bytes,
+        _label: bytes,
         transducer_type: bytes,
         physical_dimension: bytes,
         physical_min: bytes,
@@ -182,7 +181,7 @@ class EdfSignal:
     ) -> EdfSignal:
         sig = object.__new__(cls)
         sig._sampling_frequency = sampling_frequency
-        sig._label = label  # type: ignore[attr-defined]
+        sig._label = EdfSignal._label.decode(_label)  # type: ignore[attr-defined]
         sig._transducer_type = transducer_type  # type: ignore[attr-defined]
         sig._physical_dimension = physical_dimension  # type: ignore[attr-defined]
         sig._physical_min = physical_min  # type: ignore[attr-defined]
@@ -237,6 +236,17 @@ class EdfSignal:
             physical_range=(0, 9),
             digital_range=(0, 9),
         )
+
+    @property
+    def label(self) -> str:
+        """Signal label, e.g., `"EEG Fpz-Cz"` or `"Body temp"`."""
+        return self._label
+
+    @label.setter
+    def label(self, label: str) -> None:
+        if label == "EDF Annotations":
+            raise ValueError("Ordinary signal label must not be 'EDF Annotations'.")
+        self._label = label
 
     @property
     def physical_range(self) -> FloatRange:
@@ -788,7 +798,7 @@ class Edf:
                     / self.data_record_duration
                 )
             except ZeroDivisionError:
-                if raw_signal_header["label"].rstrip() == b"EDF Annotations":
+                if raw_signal_header["_label"].rstrip() == b"EDF Annotations":
                     sampling_frequency = 0
             signals.append(
                 EdfSignal._from_raw_header(sampling_frequency, **raw_signal_header)
@@ -1472,9 +1482,9 @@ def _create_annotations_signal(
     signal = EdfSignal(
         np.arange(1.0),  # placeholder signal, as argument `data` is non-optional
         sampling_frequency=maxlen // 2 / divisor,
-        label="EDF Annotations",
         physical_range=(-32768, 32767),
     )
+    signal._label = "EDF Annotations"
     signal._samples_per_data_record = EdfSignal.samples_per_data_record.encode(  # type: ignore[attr-defined]
         maxlen // 2
     )
