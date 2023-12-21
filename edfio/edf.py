@@ -1187,10 +1187,12 @@ class Edf:
 
     def append_signals(self, new_signals: EdfSignal | Iterable[EdfSignal]) -> None:
         """
-        Append one or more signal(s) to the Edf recording, after all existing ones.
+        Append one or more signal(s) to the Edf recording.
 
         Every signal must be compatible with the current `data_record_duration` and all
-        signal durations must match the overall recording duration.
+        signal durations must match the overall recording duration. For recordings
+        containing EDF+ annotation signals, the new signals are inserted after the last
+        ordinary (i.e. non-annotation) signal.
 
         Parameters
         ----------
@@ -1199,7 +1201,17 @@ class Edf:
         """
         if isinstance(new_signals, EdfSignal):
             new_signals = [new_signals]
-        self._set_signals((*self._signals, *new_signals))
+        last_ordinary_index = 0
+        for i, signal in enumerate(self._signals):
+            if signal.label != "EDF Annotations":
+                last_ordinary_index = i
+        self._set_signals(
+            [
+                *self._signals[: last_ordinary_index + 1],
+                *new_signals,
+                *self._signals[last_ordinary_index + 1 :],
+            ]
+        )
 
     @property
     def _annotation_signals(self) -> Iterable[EdfSignal]:
