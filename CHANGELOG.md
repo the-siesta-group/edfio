@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.4.0] - 2023-12-22
+
 ### Changed
 - Exclude EDF+ annotation signals from `Edf.signals`, `Edf.num_signals`, and `Edf.drop_signals()` ([#25](https://github.com/the-siesta-group/edfio/pull/25)).
 - Provide more concise `__repr__` for `Edf` and `EdfSignal` ([#26](https://github.com/the-siesta-group/edfio/pull/26)).
