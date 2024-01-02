@@ -9,8 +9,8 @@ from typing import Any, Generic, TypeVar, overload
 
 T = TypeVar("T", str, int, float, datetime.date, datetime.time)
 
-_one_or_two_digits = "(\\d{1,2})"
-_separator = "[.:'\\-\\/]"
+_one_or_two_digits = "([ ]?\\d{1,2})"
+_separator = "[.:'\\-\\/ ]"
 DATE_OR_TIME_PATTERN = re.compile(
     f"""
         {_one_or_two_digits}  # day/hour
@@ -129,7 +129,7 @@ class RawHeaderFieldDate(RawHeaderField[datetime.date]):
 
     def decode(self, field: bytes) -> datetime.date:
         date = decode_str(field)
-        match = DATE_OR_TIME_PATTERN.fullmatch(date.replace(" ", ""))
+        match = DATE_OR_TIME_PATTERN.fullmatch(date)
         if match is None:
             raise ValueError(f"Invalid date for format DD.MM.YY: {date!r}")
         day, month, year = (int(g) for g in match.groups())
@@ -151,7 +151,7 @@ class RawHeaderFieldTime(RawHeaderField[datetime.time]):
 
     def decode(self, field: bytes) -> datetime.time:
         time = decode_str(field)
-        match = DATE_OR_TIME_PATTERN.fullmatch(time.replace(" ", ""))
+        match = DATE_OR_TIME_PATTERN.fullmatch(time)
         if match is None:
             raise ValueError(f"Invalid time for format hh.mm.ss: {time!r}")
         hours, minutes, seconds = (int(g) for g in match.groups())

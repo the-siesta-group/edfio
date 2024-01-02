@@ -26,30 +26,26 @@ def test_q1_create_edf_signal_with_utf_8_label_fails():
         EdfSignal(np.arange(10.1), 1, label="SpO₂")
 
 
-@pytest.mark.parametrize(
-    "field",
-    [
-        b"02.08.51",
-        b"2.8.51  ",
-        b"2. 8.51 ",
-        b"02:08-51",
-        b"02/08'51",
-    ],
+NON_STANDARD_DATES_OR_TIMES = (
+    b"02.08.51",
+    b"2.8.51  ",
+    b"2. 8.51 ",
+    b" 2. 8.51",
+    b"02:08-51",
+    b"02/08'51",
+    b"2  8  51",
+    b" 2 8  51",
+    b" 2  8 51",
+    b"2 8 51  ",
 )
+
+
+@pytest.mark.parametrize("field", NON_STANDARD_DATES_OR_TIMES)
 def test_q2_date_decode_different_formats(field: bytes):
     assert RawHeaderFieldDate(8).decode(field) == datetime.date(2051, 8, 2)
 
 
-@pytest.mark.parametrize(
-    "field",
-    [
-        b"02.08.51",
-        b"2.8.51  ",
-        b"2. 8.51 ",
-        b"02:08-51",
-        b"02/08'51",
-    ],
-)
+@pytest.mark.parametrize("field", NON_STANDARD_DATES_OR_TIMES)
 def test_q2_time_decode_different_formats(field: bytes):
     assert RawHeaderFieldTime(8).decode(field) == datetime.time(2, 8, 51)
 
