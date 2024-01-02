@@ -31,7 +31,6 @@ from edfio._header_field import (
 from edfio._utils import (
     FloatRange,
     IntRange,
-    _unknown_to_x,
     calculate_gain_and_offset,
     decode_edfplus_date,
     encode_annotation_duration,
@@ -396,20 +395,19 @@ class Patient:
 
     Parsing from/to the string containing the local_patient_identification header field
     is done according to the EDF+ specs. Subfields must be ASCII (32..126) and may not
-    contain spaces. None values or empty strings are interpreted as unknown value and
-    encoded as `"X"`.
+    contain spaces.
 
     Parameters
     ----------
-    code : str | None, default: `"X"`
+    code : str, default: `"X"`
         The code by which the patient is known in the hospital administration.
-    sex : `{"X", "F", "M"}` | None, default: `"X"`
+    sex : `{"X", "F", "M"}`, default: `"X"`
         Sex, `F` for female, `M` for male, `X` if anonymized.
     birthdate : datetime.date | None, default: None
         Patient birthdate, stored as `X` if `None`.
-    name : str | None, default: `"X"`
+    name : str, default: `"X"`
         The patient's name, stored as `X` if `None`.
-    additional : Sequence[str | None] | None, default: `()`
+    additional : Sequence[str], default: `()`
         Optional additional subfields. Will be stored in the header field separated by
         spaces.
     """
@@ -417,30 +415,24 @@ class Patient:
     def __init__(
         self,
         *,
-        code: str | None = "X",
-        sex: Literal["F", "M", "X"] | None = "X",
+        code: str = "X",
+        sex: Literal["F", "M", "X"] = "X",
         birthdate: datetime.date | None = None,
-        name: str | None = "X",
-        additional: Sequence[str | None] | None = (),
+        name: str = "X",
+        additional: Sequence[str] = (),
     ) -> None:
-        code = _unknown_to_x(code)
-        name = _unknown_to_x(name)
-        if not sex:
-            sex = "X"
-        elif sex not in ("F", "M", "X"):
+        if sex not in ("F", "M", "X"):
             raise ValueError(f"Invalid sex: {sex}, must be one of F, M, X")
         if birthdate is None:
             birthdate_field = "X"
         else:
             birthdate_field = encode_edfplus_date(birthdate)
-        if additional is None:
-            additional = ()
         subfields = {
             "code": code,
             "sex": sex,
             "birthdate": birthdate_field,
             "name": name,
-            **{f"additional[{i}]": _unknown_to_x(v) for i, v in enumerate(additional)},
+            **{f"additional[{i}]": v for i, v in enumerate(additional)},
         }
         validate_subfields(subfields)
         local_patient_identification = " ".join(subfields.values())
@@ -504,21 +496,20 @@ class Recording:
 
     Parsing from/to the string containing the local_recording_identification header
     field is done according to the EDF+ specs. Subfields must be ASCII (32..126) and may
-    not contain spaces. None values or empty strings are interpreted as unknown value and
-    encoded as `"X"`.
+    not contain spaces.
 
     Parameters
     ----------
     startdate : datetime.date | None, default: None
         The recording startdate.
-    hospital_administration_code : str | None, default: `"X"`
+    hospital_administration_code : str, default: `"X"`
         The hospital administration code of the investigation, e.g., EEG number or PSG
         number.
-    investigator_technician_code : str | None, default: `"X"`
+    investigator_technician_code : str, default: `"X"`
         A code specifying the responsible investigator or technician.
-    equipment_code : str | None, default: `"X"`
+    equipment_code : str, default: `"X"`
         A code specifying the used equipment.
-    additional : Sequence[str | None] | None, default: `()`
+    additional : Sequence[str], default: `()`
         Optional additional subfields. Will be stored in the header field separated by
         spaces.
     """
@@ -527,23 +518,21 @@ class Recording:
         self,
         *,
         startdate: datetime.date | None = None,
-        hospital_administration_code: str | None = "X",
-        investigator_technician_code: str | None = "X",
-        equipment_code: str | None = "X",
-        additional: Sequence[str | None] | None = (),
+        hospital_administration_code: str = "X",
+        investigator_technician_code: str = "X",
+        equipment_code: str = "X",
+        additional: Sequence[str] = (),
     ) -> None:
         if startdate is None:
             startdate_field = "X"
         else:
             startdate_field = encode_edfplus_date(startdate)
-        if additional is None:
-            additional = ()
         subfields = {
             "startdate": startdate_field,
-            "hospital_administration_code": _unknown_to_x(hospital_administration_code),
-            "investigator_technician_code": _unknown_to_x(investigator_technician_code),
-            "equipment_code": _unknown_to_x(equipment_code),
-            **{f"additional[{i}]": _unknown_to_x(v) for i, v in enumerate(additional)},
+            "hospital_administration_code": hospital_administration_code,
+            "investigator_technician_code": investigator_technician_code,
+            "equipment_code": equipment_code,
+            **{f"additional[{i}]": v for i, v in enumerate(additional)},
         }
         validate_subfields(subfields)
         local_recording_identification = " ".join(("Startdate", *subfields.values()))

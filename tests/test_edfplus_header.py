@@ -338,31 +338,20 @@ def test_edf_startdate_falls_back_to_legacy_field_if_recording_field_is_not_vali
 
 
 @pytest.mark.parametrize(
-    ("code", "sex", "name", "additional"),
+    ("code", "name", "additional"),
     [
-        ("", "X", "X", ()),
-        ("X", "", "", ()),
-        ("X", "X", "X", ("add1", "", "add2")),
-        (None, "X", "X", None),
-        ("X", None, None, None),
-        ("X", "X", "X", (None, "add2")),
+        ("", "X", ()),
+        ("X", "", ()),
+        ("X", "X", ("add1", "", "add2")),
     ],
 )
-def test_patient_assumes_unspecified_subfields_as_unknown(
-    code: str | None,
-    sex: str | None,
-    name: str | None,
-    additional: tuple[str | None, ...] | None,
+def test_patient_raises_error_on_empty_subfields(
+    code: str,
+    name: str,
+    additional: tuple[str, ...],
 ):
-    patient = Patient(code=code, sex=sex, name=name, additional=additional)
-    assert patient.code == code if code else "X"
-    assert patient.sex == sex if sex else "X"
-    assert patient.name == name if name else "X"
-    expected_additional = list(additional) if additional else []
-    for i in range(len(expected_additional)):
-        if expected_additional[i] is None or expected_additional[i] == "":
-            expected_additional[i] = "X"
-    assert patient.additional == tuple(expected_additional)
+    with pytest.raises(ValueError, match="must not be an empty string"):
+        Patient(code=code, name=name, additional=additional)
 
 
 def test_read_patient_all_subfields_missing():
@@ -392,55 +381,25 @@ def test_read_patient_some_subfields_missing():
         "additional",
     ),
     [
-        ("X", "X", "X", ()),
-        ("X", "X", "", ()),
-        ("X", "", "X", ()),
         ("", "X", "X", ()),
-        ("X", "", "", ()),
-        ("", "X", "", ()),
-        ("", "", "X", ()),
-        ("", "", "", ()),
-        ("X", "X", None, None),
-        ("X", None, "X", None),
-        (None, "X", "X", None),
-        ("X", None, None, None),
-        (None, "X", None, None),
-        (None, None, "X", None),
-        (None, None, None, None),
-        ("X", "X", "X", ("add1", "add2")),
-        ("X", "X", "X", ("add1", "")),
-        ("X", "X", "X", (None, "add2")),
+        ("X", "", "X", ()),
+        ("X", "X", "", ()),
+        ("X", "X", "X", ("add1", "", "add2")),
     ],
 )
-def test_recording_assumes_unspecified_subfields_as_unknown(
-    hospital_administration_code: str | None,
-    investigator_technician_code: str | None,
-    equipment_code: str | None,
-    additional: tuple[str | None, ...] | None,
+def test_recording_raises_error_on_empty_subfields(
+    hospital_administration_code: str,
+    investigator_technician_code: str,
+    equipment_code: str,
+    additional: tuple[str, ...],
 ):
-    recording = Recording(
-        startdate=datetime.date(2002, 3, 2),
-        hospital_administration_code=hospital_administration_code,
-        investigator_technician_code=investigator_technician_code,
-        equipment_code=equipment_code,
-        additional=additional,
-    )
-    assert (
-        recording.hospital_administration_code == hospital_administration_code
-        if hospital_administration_code
-        else "X"
-    )
-    assert (
-        recording.investigator_technician_code == investigator_technician_code
-        if investigator_technician_code
-        else "X"
-    )
-    assert recording.equipment_code == equipment_code if equipment_code else "X"
-    expected_additional = list(additional) if additional else []
-    for i in range(len(expected_additional)):
-        if expected_additional[i] is None or expected_additional[i] == "":
-            expected_additional[i] = "X"
-    assert recording.additional == tuple(expected_additional)
+    with pytest.raises(ValueError, match="must not be an empty string"):
+        Recording(
+            hospital_administration_code=hospital_administration_code,
+            investigator_technician_code=investigator_technician_code,
+            equipment_code=equipment_code,
+            additional=additional,
+        )
 
 
 def test_read_recording_all_subfields_missing():

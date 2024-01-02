@@ -94,11 +94,7 @@ def round_float_to_8_characters(
 
 def validate_subfields(subfields: dict[str, str]) -> None:
     for key, value in subfields.items():
+        if not value:
+            raise ValueError(f"Subfield {key} must not be an empty string")
         if " " in value:
             raise ValueError(f"Subfield {key} contains spaces: {value!r}")
-
-
-def _unknown_to_x(value: str | None) -> str:
-    if not value:
-        return "X"
-    return value
