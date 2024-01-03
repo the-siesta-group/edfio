@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+### Fixed
+- Allow reading more non-standard starttime and startdate fields ([#30](https://github.com/the-siesta-group/edfio/pull/30)).
+
 ## [0.4.0] - 2023-12-22
 
 ### Changed
