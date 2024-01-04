@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import datetime
 
 import numpy as np
@@ -403,7 +401,7 @@ def test_recording_raises_error_on_empty_subfields(
 
 
 def test_read_recording_all_subfields_missing():
-    recording = Recording._from_str("Startdate")
+    recording = Recording._from_str("Startdate ")
     assert recording.hospital_administration_code == "X"
     assert recording.investigator_technician_code == "X"
     assert recording.equipment_code == "X"

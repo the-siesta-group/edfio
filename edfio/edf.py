@@ -458,32 +458,46 @@ class Patient:
     @property
     def code(self) -> str:
         """The code by which the patient is known in the hospital administration."""
-        return self._get_subfield(0)
+        return self.get_subfield(0)
 
     @property
     def sex(self) -> str:
         """Sex, `F` for female, `M` for male, `X` if anonymized."""
-        return self._get_subfield(1)
+        return self.get_subfield(1)
 
     @property
     def birthdate(self) -> datetime.date:
         """Patient birthdate."""
-        birthdate_field = self._get_subfield(2)
-        if birthdate_field == "X" or birthdate_field is None:
+        birthdate_field = self.get_subfield(2)
+        if birthdate_field == "X":
             raise AnonymizedDateError("Patient birthdate is not available ('X').")
         return decode_edfplus_date(birthdate_field)
 
     @property
     def name(self) -> str:
         """The patient's name."""
-        return self._get_subfield(3)
+        return self.get_subfield(3)
 
     @property
     def additional(self) -> tuple[str, ...]:
         """Optional additional subfields."""
         return tuple(self._local_patient_identification.split()[4:])
 
-    def _get_subfield(self, idx: int) -> str:
+    def get_subfield(self, idx: int) -> str:
+        """
+        Access a subfield of the local patient identification field by index.
+
+        Parameters
+        ----------
+        idx : int
+            The index of the subfield to access.
+
+        Returns
+        -------
+        str
+            The subfield at the specified index. If the index exceeds the actually
+            available number of subfields, the return value is `"X"`.
+        """
         subfields = self._local_patient_identification.split()
         if len(subfields) <= idx:
             return "X"
@@ -558,12 +572,12 @@ class Recording:
     @property
     def startdate(self) -> datetime.date:
         """The recording startdate."""
-        if not self._local_recording_identification.startswith("Startdate"):
+        if not self._local_recording_identification.startswith("Startdate "):
             raise ValueError(
                 f"Local recording identification field {self._local_recording_identification!r} does not follow EDF+ standard."
             )
         startdate_field = self.get_subfield(1)
-        if startdate_field == "X" or startdate_field is None:
+        if startdate_field == "X":
             raise AnonymizedDateError("Recording startdate is not available ('X').")
         return decode_edfplus_date(startdate_field)
 
@@ -601,7 +615,7 @@ class Recording:
         -------
         str
             The subfield at the specified index. If the index exceeds the actually
-            specified number of subfields, the return value is `"X"`.
+            available number of subfields, the return value is `"X"`.
         """
         subfields = self._local_recording_identification.split()
         if len(subfields) <= idx:
