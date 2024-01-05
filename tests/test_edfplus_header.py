@@ -25,7 +25,6 @@ def edf(patient, recording):
 
 LOCAL_RECORDING_IDENTIFICATION_WITH_INVALID_STARTDATE = [
     b"",
-    b"Startdate",
     b"xxx 01-JAN-2001 X X X",
     b"01-JAN-2001",
 ]
@@ -353,6 +352,25 @@ def test_patient_raises_error_on_empty_subfields(
         Patient(code=code, name=name, additional=additional)
 
 
+def test_read_patient_all_subfields_missing():
+    patient = Patient._from_str("")
+    assert patient.code == "X"
+    assert patient.sex == "X"
+    assert patient.name == "X"
+    assert patient.additional == ()
+    with pytest.raises(AnonymizedDateError, match="birthdate is not available"):
+        patient.birthdate
+
+
+def test_read_patient_some_subfields_missing():
+    patient = Patient._from_str("X M 21-AUG-1984")
+    assert patient.code == "X"
+    assert patient.sex == "M"
+    assert patient.name == "X"
+    assert patient.birthdate == datetime.date(1984, 8, 21)
+    assert patient.additional == ()
+
+
 @pytest.mark.parametrize(
     (
         "hospital_administration_code",
@@ -380,3 +398,22 @@ def test_recording_raises_error_on_empty_subfields(
             equipment_code=equipment_code,
             additional=additional,
         )
+
+
+def test_read_recording_all_subfields_missing():
+    recording = Recording._from_str("Startdate ")
+    assert recording.hospital_administration_code == "X"
+    assert recording.investigator_technician_code == "X"
+    assert recording.equipment_code == "X"
+    assert recording.additional == ()
+    with pytest.raises(AnonymizedDateError, match="startdate is not available"):
+        recording.startdate
+
+
+def test_read_recording_some_subfields_missing():
+    recording = Recording._from_str("Startdate 13-MAY-2025 X")
+    assert recording.hospital_administration_code == "X"
+    assert recording.investigator_technician_code == "X"
+    assert recording.equipment_code == "X"
+    assert recording.additional == ()
+    assert recording.startdate == datetime.date(2025, 5, 13)
