@@ -1661,6 +1661,8 @@ def read_edf(edf_file: Path | str | io.BufferedReader | io.BytesIO | bytes) -> E
     """
     Read an EDF file into an :class:`Edf` object.
 
+    If a file-like object is passed, its stream position is moved to EOF.
+
     Parameters
     ----------
     edf_file : Path | str | io.BufferedReader | io.BytesIO
