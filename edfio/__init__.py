@@ -1,11 +1,5 @@
-from edfio.edf import (
-    AnonymizedDateError,
-    Edf,
-    EdfAnnotation,
-    Patient,
-    Recording,
-    read_edf,
-)
+from edfio.edf import Edf, EdfAnnotation, read_edf
+from edfio.edf_header import AnonymizedDateError, Patient, Recording
 from edfio.edf_signal import EdfSignal
 
 __version__ = "0.0.0"

@@ -1,35 +1,6 @@
-import datetime
-
 import pytest
 
-from edfio._utils import (
-    decode_edfplus_date,
-    encode_annotation_duration,
-    encode_annotation_onset,
-    encode_edfplus_date,
-)
-
-VALID_EDFPLUS_DATE_PAIRS = (
-    ("02-MAY-1951", datetime.date(1951, 5, 2)),
-    ("02-DEC-1951", datetime.date(1951, 12, 2)),
-    ("02-AUG-1951", datetime.date(1951, 8, 2)),
-    ("02-MAY-2051", datetime.date(2051, 5, 2)),
-)
-
-
-@pytest.mark.parametrize(("string", "datetime_"), VALID_EDFPLUS_DATE_PAIRS)
-def test_decode_edfplus_date(string: str, datetime_: datetime.date):
-    assert decode_edfplus_date(string) == datetime_
-
-
-@pytest.mark.parametrize(("string", "datetime_"), VALID_EDFPLUS_DATE_PAIRS)
-def test_encode_edfplus_date(string: str, datetime_: datetime.date):
-    assert encode_edfplus_date(datetime_) == string
-
-
-def test_decode_edfplus_date_invalid_month_name():
-    with pytest.raises(ValueError, match="Invalid month"):
-        decode_edfplus_date("02-MAI-1951")
+from edfio._utils import encode_annotation_duration, encode_annotation_onset
 
 
 @pytest.mark.parametrize(
