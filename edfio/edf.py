@@ -5,17 +5,15 @@ import copy
 import datetime
 import io
 import math
-import re
 import tempfile
 import warnings
 from collections.abc import Iterable, Sequence
-from dataclasses import dataclass
 from decimal import Decimal
 from fractions import Fraction
 from functools import singledispatch
 from math import ceil, floor
 from pathlib import Path
-from typing import Any, Literal, NamedTuple
+from typing import Any, Literal
 
 import numpy as np
 
@@ -27,9 +25,10 @@ from edfio._header_field import (
     RawHeaderFieldTime,
     get_header_fields,
 )
-from edfio._utils import (
-    encode_annotation_duration,
-    encode_annotation_onset,
+from edfio.edf_annotations import (
+    EdfAnnotation,
+    _create_annotations_signal,
+    _EdfAnnotationsDataRecord,
 )
 from edfio.edf_header import (
     AnonymizedDateError,
@@ -38,34 +37,6 @@ from edfio.edf_header import (
     _encode_edfplus_date,
 )
 from edfio.edf_signal import EdfSignal
-
-_ANNOTATIONS_PATTERN = re.compile(
-    """
-    ([+-]\\d+(?:\\.?\\d+)?)       # onset
-    (?:\x15(\\d+(?:\\.?\\d+)?))?  # duration, optional
-    (?:\x14(.*?))                 # annotation texts
-    \x14\x00                      # terminator
-    """,
-    re.VERBOSE,
-)
-
-
-class EdfAnnotation(NamedTuple):
-    """A single EDF+ annotation.
-
-    Parameters
-    ----------
-    onset : float
-        The annotation onset in seconds from recording start.
-    duration : float | None
-        The annotation duration in seconds (`None` if annotation has no duration).
-    text : str
-        The annotation text, can be empty.
-    """
-
-    onset: float
-    duration: float | None
-    text: str
 
 
 class Edf:
@@ -940,106 +911,6 @@ class Edf:
             with_timestamps=is_timekeeping_signal,
             subsecond_offset=self._subsecond_offset + start - int(start),
         )
-
-
-def _create_annotations_signal(
-    annotations: Iterable[EdfAnnotation],
-    *,
-    num_data_records: int,
-    data_record_duration: float,
-    with_timestamps: bool = True,
-    subsecond_offset: float = 0,
-) -> EdfSignal:
-    data_record_starts = np.arange(num_data_records) * data_record_duration
-    annotations = sorted(annotations)
-    data_records = []
-    for i, start in enumerate(data_record_starts):
-        end = start + data_record_duration
-        tals: list[_EdfTAL] = []
-        if with_timestamps:
-            tals.append(_EdfTAL(np.round(start + subsecond_offset, 12), None, [""]))
-        for ann in annotations:
-            if (
-                (i == 0 and ann.onset < 0)
-                or (i == (num_data_records - 1) and end <= ann.onset)
-                or (start <= ann.onset < end)
-            ):
-                tals.append(
-                    _EdfTAL(
-                        np.round(ann.onset + subsecond_offset, 12),
-                        ann.duration,
-                        [ann.text],
-                    )
-                )
-        data_records.append(_EdfAnnotationsDataRecord(tals).to_bytes())
-    maxlen = max(len(data_record) for data_record in data_records)
-    if maxlen % 2:
-        maxlen += 1
-    raw = b"".join(dr.ljust(maxlen, b"\x00") for dr in data_records)
-    divisor = data_record_duration if data_record_duration else 1
-    signal = EdfSignal(
-        np.arange(1.0),  # placeholder signal, as argument `data` is non-optional
-        sampling_frequency=maxlen // 2 / divisor,
-        physical_range=(-32768, 32767),
-    )
-    signal._label = "EDF Annotations"
-    signal._samples_per_data_record = EdfSignal.samples_per_data_record.encode(  # type: ignore[attr-defined]
-        maxlen // 2
-    )
-    signal._digital = np.frombuffer(raw, dtype=np.int16).copy()
-    return signal
-
-
-@dataclass
-class _EdfTAL:
-    onset: float
-    duration: float | None
-    texts: list[str]
-
-    def to_bytes(self) -> bytes:
-        timing = encode_annotation_onset(self.onset)
-        if self.duration is not None:
-            timing += f"\x15{encode_annotation_duration(self.duration)}"
-        texts_joined = "\x14".join(self.texts)
-        return f"{timing}\x14{texts_joined}\x14".encode()
-
-
-@dataclass
-class _EdfAnnotationsDataRecord:
-    tals: list[_EdfTAL]
-
-    def to_bytes(self) -> bytes:
-        return b"\x00".join(tal.to_bytes() for tal in self.tals) + b"\x00"
-
-    @classmethod
-    def from_bytes(cls, raw: bytes) -> _EdfAnnotationsDataRecord:
-        tals: list[_EdfTAL] = []
-        matches: list[tuple[str, str, str]] = _ANNOTATIONS_PATTERN.findall(raw.decode())
-        if not matches and raw.replace(b"\x00", b""):
-            raise ValueError(f"No valid annotations found in {raw!r}")
-        for onset, duration, texts in matches:
-            tals.append(
-                _EdfTAL(
-                    float(onset),
-                    float(duration) if duration else None,
-                    list(texts.split("\x14")),
-                )
-            )
-        return cls(tals)
-
-    @property
-    def annotations(self) -> list[EdfAnnotation]:
-        return [
-            EdfAnnotation(tal.onset, tal.duration, text)
-            for tal in self.tals
-            for text in tal.texts
-        ]
-
-    def drop_annotations_with_text(self, text: str) -> None:
-        for tal in self.tals:
-            while text in tal.texts:
-                tal.texts.remove(text)
-        self.tals = [tal for tal in self.tals if tal.texts]
 
 
 def _calculate_num_data_records(

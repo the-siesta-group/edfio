@@ -19,7 +19,8 @@ from edfio import (
     Recording,
     read_edf,
 )
-from edfio.edf import _calculate_num_data_records, _create_annotations_signal
+from edfio.edf import _calculate_num_data_records
+from edfio.edf_annotations import _create_annotations_signal
 from edfio.edf_signal import _FloatRange
 from tests import TEST_DATA_DIR
 
