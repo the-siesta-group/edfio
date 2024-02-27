@@ -6,6 +6,7 @@ import datetime
 import io
 import math
 import re
+import tempfile
 import warnings
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
@@ -1649,7 +1650,14 @@ def _(edf_file: bytes) -> Edf:
 
 # Pyright loses information about parameters for singledispatch functions. Hiding it
 # behind this normal function makes things work again.
-def read_edf(edf_file: Path | str | io.BufferedReader | io.BytesIO | bytes) -> Edf:
+def read_edf(
+    edf_file: Path
+    | str
+    | io.BufferedReader
+    | io.BytesIO
+    | bytes
+    | tempfile.SpooledTemporaryFile[bytes],
+) -> Edf:
     """
     Read an EDF file into an :class:`Edf` object.
 
