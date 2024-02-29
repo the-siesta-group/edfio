@@ -6,6 +6,7 @@ import datetime
 import io
 import math
 import re
+import tempfile
 import warnings
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
@@ -1621,7 +1622,10 @@ def _calculate_data_record_duration(signals: Sequence[EdfSignal]) -> float:
 
 @singledispatch
 def _read_edf(edf_file: Any) -> Edf:
-    raise NotImplementedError(f"Can not read EDF from {type(edf_file)}")
+    edf = object.__new__(Edf)
+    edf._read_header(edf_file)
+    edf._load_data(edf_file)
+    return edf
 
 
 @_read_edf.register
@@ -1644,20 +1648,16 @@ def _(edf_file: bytes) -> Edf:
     return _read_edf(io.BytesIO(edf_file))
 
 
-# explicit register is necessary because type unions are only supported from Python 3.11
-@_read_edf.register(io.BufferedReader)
-@_read_edf.register(io.BufferedRandom)
-@_read_edf.register(io.BytesIO)
-def _(edf_file: io.BufferedReader | io.BufferedRandom | io.BytesIO) -> Edf:
-    edf = object.__new__(Edf)
-    edf._read_header(edf_file)
-    edf._load_data(edf_file)
-    return edf
-
-
 # Pyright loses information about parameters for singledispatch functions. Hiding it
 # behind this normal function makes things work again.
-def read_edf(edf_file: Path | str | io.BufferedReader | io.BytesIO | bytes) -> Edf:
+def read_edf(
+    edf_file: Path
+    | str
+    | io.BufferedReader
+    | io.BytesIO
+    | bytes
+    | tempfile.SpooledTemporaryFile[bytes],
+) -> Edf:
     """
     Read an EDF file into an :class:`Edf` object.
 

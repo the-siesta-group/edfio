@@ -4,6 +4,7 @@ import datetime
 import io
 import json
 import re
+import tempfile
 from pathlib import Path
 from typing import Literal
 
@@ -653,8 +654,15 @@ def test_read_edf_bytes_io():
     assert read_edf(io.BytesIO(EDF_FILE.read_bytes())).num_signals == 7
 
 
+def test_read_edf_spooled_temporary_file():
+    with tempfile.SpooledTemporaryFile(mode="w+b") as file:
+        file.write(EDF_FILE.read_bytes())
+        file.seek(0)
+        assert read_edf(file).num_signals == 7
+
+
 def test_read_edf_writable_file_raises_error(tmp_path: Path):
-    with pytest.raises(NotImplementedError, match="Can not read EDF from"):
+    with pytest.raises(io.UnsupportedOperation, match="read"):
         with (tmp_path / "test.edf").open("wb") as edf_file:
             assert read_edf(edf_file)
 
