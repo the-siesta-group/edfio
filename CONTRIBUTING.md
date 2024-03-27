@@ -60,8 +60,7 @@ For docstrings, adhere to [numpydoc](https://numpydoc.readthedocs.io/en/latest/f
 
 ## Code style
 We use the following tools for code style and quality:
-- [Black](https://black.readthedocs.io/en/stable/) for formatting
-- [Ruff](https://docs.astral.sh/ruff/) for linting
+- [Ruff](https://docs.astral.sh/ruff/) for formatting and linting
 - [mypy](https://mypy.readthedocs.io/en/stable/) for static type checking
 
 The development environment includes these tools, so you can either run them individually or use pre-commit.

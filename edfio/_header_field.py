@@ -64,12 +64,10 @@ class RawHeaderField(ABC, Generic[T]):
         self.is_settable = is_settable
 
     @overload
-    def __get__(self, instance: None, owner: Any) -> RawHeaderField[T]:
-        ...
+    def __get__(self, instance: None, owner: Any) -> RawHeaderField[T]: ...
 
     @overload
-    def __get__(self, instance: Any, owner: Any) -> T:
-        ...
+    def __get__(self, instance: Any, owner: Any) -> T: ...
 
     def __get__(self, instance: Any, owner: Any = None) -> RawHeaderField[T] | T:
         if instance is None:
