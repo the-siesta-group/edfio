@@ -119,7 +119,7 @@ class Edf:
                 "Data record duration must be zero for annotation-only files"
             )
 
-        self._data_record_duration = encode_float(data_record_duration, 8)
+        self._data_record_duration = encode_float(data_record_duration)
         self._set_num_data_records_with_signals(signals)
         self._version = encode_int(0, 8)
         self.local_patient_identification = patient._to_str()
@@ -251,7 +251,7 @@ class Edf:
         self._bytes_in_header_record = encode_int(256 * (len(signals) + 1), 8)
         self._total_num_signals = len(signals)
         if all(s.label == "EDF Annotations" for s in signals):
-            self._data_record_duration = encode_float(0, 8)
+            self._data_record_duration = encode_float(0)
 
     def _set_num_data_records_with_signals(
         self,
@@ -581,7 +581,7 @@ class Edf:
         self._update_record_duration_in_annotation_signals(
             data_record_duration, num_data_records
         )
-        self._data_record_duration = encode_float(data_record_duration, 8)
+        self._data_record_duration = encode_float(data_record_duration)
         self._num_data_records = encode_int(num_data_records, 8)
 
     @property

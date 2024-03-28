@@ -36,10 +36,10 @@ def encode_int(value: int, length: int) -> bytes:
     return encode_str(str(value), length)
 
 
-def encode_float(value: float, length: int) -> bytes:
+def encode_float(value: float) -> bytes:
     if float(value).is_integer():
         value = int(value)
-    return encode_str(str(value), length)
+    return encode_str(str(value), 8)
 
 
 def decode_float(field: bytes) -> float:

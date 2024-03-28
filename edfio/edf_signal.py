@@ -400,10 +400,10 @@ class EdfSignal:
                     f"Signal range [{data_min}, {data_max}] out of physical range: [{physical_range.min}, {physical_range.max}]"
                 )
         self._physical_min = encode_float(
-            _round_float_to_8_characters(physical_range.min, math.floor), 8
+            _round_float_to_8_characters(physical_range.min, math.floor)
         )
         self._physical_max = encode_float(
-            _round_float_to_8_characters(physical_range.max, math.ceil), 8
+            _round_float_to_8_characters(physical_range.max, math.ceil)
         )
 
     def _set_data(self, data: npt.NDArray[np.float64]) -> None:

@@ -17,7 +17,7 @@ def test_encode_int_exceeding_field_length_fails():
 
 def test_encode_float_exceeding_field_length_fails():
     with pytest.raises(ValueError, match="exceeds maximum field length"):
-        encode_float(123456789.12345, 8)
+        encode_float(123456789.12345)
 
 
 @pytest.mark.parametrize(
@@ -29,7 +29,7 @@ def test_encode_float_exceeding_field_length_fails():
     ],
 )
 def test_encode_float(value: float, expected: bytes):
-    assert encode_float(value, 8) == expected
+    assert encode_float(value) == expected
 
 
 def test_decode_str():
