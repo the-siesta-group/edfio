@@ -166,16 +166,37 @@ class Edf:
     def _load_data(self, file: Path | io.BufferedReader | io.BytesIO) -> None:
         lens = [signal.samples_per_data_record for signal in self._signals]
         datarecord_len = sum(lens)
+        truncated = False
         if not isinstance(file, Path):
-            datarecords = np.frombuffer(file.read(), dtype=np.int16)
+            data_bytes = file.read()
+            actual_records = len(data_bytes) // (datarecord_len * 2)
+            if actual_records * datarecord_len * 2 < len(data_bytes):
+                truncated = True
+            datarecords = np.frombuffer(
+                data_bytes, dtype=np.int16, count=actual_records * datarecord_len
+            )
+            datarecords.shape = (actual_records, datarecord_len)
         else:
+            remaining_bytes = file.stat().st_size - self.bytes_in_header_record
+            actual_records = remaining_bytes // (datarecord_len * 2)
+            if actual_records * datarecord_len * 2 < remaining_bytes:
+                truncated = True
             datarecords = np.memmap(
                 file,
                 dtype=np.int16,
                 mode="r",
                 offset=self.bytes_in_header_record,
+                shape=(actual_records, datarecord_len),
             )
-        datarecords.shape = (self.num_data_records, datarecord_len)
+        if truncated:
+            warnings.warn(
+                "Incomplete data record at the end of the EDF file. Data was truncated."
+            )
+        if self.num_data_records not in (-1, actual_records):
+            warnings.warn(
+                f"EDF header indicates {self.num_data_records} data records, but file contains {actual_records} records. Updating header."
+            )
+            self._num_data_records = Edf.num_data_records.encode(actual_records)
         ends = np.cumsum(lens)
         starts = ends - lens
 
