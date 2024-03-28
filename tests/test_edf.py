@@ -1187,18 +1187,17 @@ def test_read_edf_with_invalid_number_of_records(
         file.seek(236)
         file.write(str(num_records_in_header).encode("us-ascii"))
         size_delta = file_length_in_bytes - EDF_FILE.stat().st_size
-        if size_delta < 0:
-            file.truncate(file_length_in_bytes)
-        elif size_delta > 0:
+        if size_delta > 0:
             file.seek(0, 2)
             file.write(b"\0" * size_delta)
 
-    with pytest.warns(
-        UserWarning,
-        match=expected_warning,
-    ):
-        edf = read_edf(invalid_edf)
-    assert edf.num_data_records == 10
-    comparison_edf = read_edf(EDF_FILE)
-    for signal, comparison_signal in zip(edf.signals, comparison_edf.signals):
-        np.testing.assert_array_equal(signal.data, comparison_signal.data)
+    for io_obj in (invalid_edf, invalid_edf.read_bytes()):
+        with pytest.warns(
+            UserWarning,
+            match=expected_warning,
+        ):
+            edf = read_edf(io_obj)
+        assert edf.num_data_records == 10
+        comparison_edf = read_edf(EDF_FILE)
+        for signal, comparison_signal in zip(edf.signals, comparison_edf.signals):
+            np.testing.assert_array_equal(signal.data, comparison_signal.data)

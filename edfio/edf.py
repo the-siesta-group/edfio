@@ -168,11 +168,13 @@ class Edf:
         datarecord_len = sum(lens)
         truncated = False
         if not isinstance(file, Path):
-            datarecords = np.frombuffer(file.read(), dtype=np.int16)
-            actual_records = len(datarecords) // datarecord_len
-            if actual_records * datarecord_len < len(datarecords):
-                datarecords = datarecords[: actual_records * datarecord_len]
+            data_bytes = file.read()
+            actual_records = len(data_bytes) // (datarecord_len * 2)
+            if actual_records * datarecord_len * 2 < len(data_bytes):
                 truncated = True
+            datarecords = np.frombuffer(
+                data_bytes, dtype=np.int16, count=actual_records * datarecord_len
+            )
             datarecords.shape = (actual_records, datarecord_len)
         else:
             remaining_bytes = file.stat().st_size - self.bytes_in_header_record
