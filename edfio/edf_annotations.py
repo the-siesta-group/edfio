@@ -7,6 +7,7 @@ from typing import NamedTuple
 
 import numpy as np
 
+from edfio._header_field import encode_int
 from edfio.edf_signal import EdfSignal
 
 _ANNOTATIONS_PATTERN = re.compile(
@@ -94,10 +95,8 @@ def _create_annotations_signal(
         sampling_frequency=maxlen // 2 / divisor,
         physical_range=(-32768, 32767),
     )
-    signal._label = "EDF Annotations"
-    signal._samples_per_data_record = EdfSignal.samples_per_data_record.encode(  # type: ignore[attr-defined]
-        maxlen // 2
-    )
+    signal._label = b"EDF Annotations "
+    signal._samples_per_data_record = encode_int(maxlen // 2, 8)  # type: ignore[attr-defined]
     signal._digital = np.frombuffer(raw, dtype=np.int16).copy()
     return signal
 

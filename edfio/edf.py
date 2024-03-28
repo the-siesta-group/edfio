@@ -23,6 +23,7 @@ from edfio._header_field import (
     RawHeaderFieldInt,
     RawHeaderFieldStr,
     RawHeaderFieldTime,
+    encode_int,
     get_header_fields,
 )
 from edfio.edf_annotations import (
@@ -258,7 +259,7 @@ class Edf:
     def _parse_signal_headers(self, raw_signal_headers: bytes) -> tuple[EdfSignal, ...]:
         raw_headers_split: dict[str, list[bytes]] = {}
         start = 0
-        for header_name, length in get_header_fields(EdfSignal):
+        for header_name, length in EdfSignal._header_fields:
             end = start + length * self._num_signals
             raw_header = raw_signal_headers[start:end]
             raw_headers_split[header_name] = [
@@ -276,7 +277,7 @@ class Edf:
                     / self.data_record_duration
                 )
             except ZeroDivisionError:
-                if raw_signal_header["_label"].rstrip() == b"EDF Annotations":
+                if raw_signal_header["label"].rstrip() == b"EDF Annotations":
                     sampling_frequency = 0
             signals.append(
                 EdfSignal._from_raw_header(sampling_frequency, **raw_signal_header)
@@ -301,13 +302,13 @@ class Edf:
         else:
             num_data_records = self.num_data_records
         for signal in self._signals:
-            signal._samples_per_data_record = EdfSignal.samples_per_data_record.encode(  # type: ignore[attr-defined]
-                len(signal._digital) // num_data_records
+            signal._samples_per_data_record = encode_int(  # type: ignore[attr-defined]
+                len(signal._digital) // num_data_records, 8
             )
         header_records = []
         for header_name, _ in get_header_fields(Edf):
             header_records.append(getattr(self, "_" + header_name))
-        for header_name, _ in get_header_fields(EdfSignal):
+        for header_name, _ in EdfSignal._header_fields:
             for signal in self._signals:
                 header_records.append(getattr(signal, "_" + header_name))
         header_record = b"".join(header_records)
@@ -478,9 +479,7 @@ class Edf:
             if maxlen % 2:
                 maxlen += 1
             raw = b"".join(dr.ljust(maxlen, b"\x00") for dr in data_records)
-            timekeeping_signal._samples_per_data_record = (  # type: ignore[attr-defined]
-                EdfSignal.samples_per_data_record.encode(maxlen // 2)
-            )
+            timekeeping_signal._samples_per_data_record = encode_int(maxlen // 2, 8)  # type: ignore[attr-defined]
             timekeeping_signal._sampling_frequency = (
                 maxlen // 2 * self.data_record_duration
             )
