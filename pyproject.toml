@@ -77,7 +77,5 @@ disallow_untyped_defs = true
 warn_unreachable = true
 strict_equality = true
 pretty = true
+warn_unused_ignores = true
 packages = ["edfio"]
-
-[tool.coverage.report]
-exclude_lines = ["@abstractmethod", "@overload"]

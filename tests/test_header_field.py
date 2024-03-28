@@ -1,10 +1,10 @@
 import pytest
 
 from edfio._header_field import (
-    RawHeaderFieldDate,
-    RawHeaderFieldTime,
+    decode_date,
     decode_float,
     decode_str,
+    decode_time,
     encode_float,
     encode_int,
 )
@@ -52,19 +52,19 @@ def test_decode_float_exceeding_float_range_fails(field: bytes):
 )
 def test_date_decode_invalid_format(date: bytes):
     with pytest.raises(ValueError, match="Invalid date for format"):
-        RawHeaderFieldDate(8).decode(date)
+        decode_date(date)
 
 
 def test_date_decode_invalid_day():
     with pytest.raises(ValueError, match="day is out of range for month"):
-        RawHeaderFieldDate(8).decode(b"32.08.51")
+        decode_date(b"32.08.51")
 
 
 def test_date_decode_invalid_month():
     with pytest.raises(ValueError, match="month must be in 1..12"):
-        RawHeaderFieldDate(8).decode(b"02.13.51")
+        decode_date(b"02.13.51")
 
 
 def test_time_decode_invalid_format():
     with pytest.raises(ValueError, match="Invalid time for format"):
-        RawHeaderFieldTime(8).decode(b"02_08_51")
+        decode_time(b"02_08_51")
