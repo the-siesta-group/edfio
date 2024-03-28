@@ -166,16 +166,35 @@ class Edf:
     def _load_data(self, file: Path | io.BufferedReader | io.BytesIO) -> None:
         lens = [signal.samples_per_data_record for signal in self._signals]
         datarecord_len = sum(lens)
+        truncated = False
         if not isinstance(file, Path):
             datarecords = np.frombuffer(file.read(), dtype=np.int16)
+            actual_records = len(datarecords) // datarecord_len
+            if actual_records * datarecord_len < len(datarecords):
+                datarecords = datarecords[: actual_records * datarecord_len]
+                truncated = True
+            datarecords.shape = (actual_records, datarecord_len)
         else:
+            remaining_bytes = file.stat().st_size - self.bytes_in_header_record
+            actual_records = remaining_bytes // (datarecord_len * 2)
+            if actual_records * datarecord_len * 2 < remaining_bytes:
+                truncated = True
             datarecords = np.memmap(
                 file,
                 dtype=np.int16,
                 mode="r",
                 offset=self.bytes_in_header_record,
+                shape=(actual_records, datarecord_len),
             )
-        datarecords.shape = (self.num_data_records, datarecord_len)
+        if truncated:
+            warnings.warn(
+                "Incomplete data record at the end of the EDF file. Data was truncated."
+            )
+        if self.num_data_records not in (-1, actual_records):
+            self._num_data_records = Edf.num_data_records.encode(actual_records)
+            warnings.warn(
+                "num_data_records field does not match actual number of data records. Correcting."
+            )
         ends = np.cumsum(lens)
         starts = ends - lens
 

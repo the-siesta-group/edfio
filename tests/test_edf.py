@@ -5,6 +5,7 @@ import io
 import json
 import tempfile
 from pathlib import Path
+from shutil import copyfile
 from typing import Literal
 
 import numpy as np
@@ -1160,3 +1161,44 @@ def test_sampling_frequencies_leading_to_floating_point_issues_in_signal_duratio
     assert edf.num_data_records == 10
     assert edf.signals[0].samples_per_data_record == 22
     assert edf.signals[1].samples_per_data_record == 9
+
+
+# fmt: off
+@pytest.mark.parametrize(
+    ("file_length_in_bytes", "num_records_in_header", "expected_warning"),
+    [
+    #    header   data_length   extra bytes     num records field    expected warning
+        (2048  +  10*18240      +1,             10,                  "Incomplete data record at the end of the EDF file"),
+        (2048  +  10*18240      +15,            11,                  "Incomplete data record at the end of the EDF file"),
+        (2048  +  10*18240      +0,             9,                   "num_data_records field does not match actual number of data records"),
+        (2048  +  10*18240      +0,             11,                  "num_data_records field does not match actual number of data records"),
+    ],
+)
+# fmt: on
+def test_read_edf_with_invalid_number_of_records(
+    tmp_path: Path,
+    file_length_in_bytes: int,
+    num_records_in_header: int,
+    expected_warning: str,
+):
+    invalid_edf = tmp_path / "invalid.edf"
+    copyfile(EDF_FILE, invalid_edf)
+    with invalid_edf.open("rb+") as file:
+        file.seek(236)
+        file.write(str(num_records_in_header).encode("us-ascii"))
+        size_delta = file_length_in_bytes - EDF_FILE.stat().st_size
+        if size_delta < 0:
+            file.truncate(file_length_in_bytes)
+        elif size_delta > 0:
+            file.seek(0, 2)
+            file.write(b"\0" * size_delta)
+
+    with pytest.warns(
+        UserWarning,
+        match=expected_warning,
+    ):
+        edf = read_edf(invalid_edf)
+    assert edf.num_data_records == 10
+    comparison_edf = read_edf(EDF_FILE)
+    for signal, comparison_signal in zip(edf.signals, comparison_edf.signals):
+        np.testing.assert_array_equal(signal.data, comparison_signal.data)
