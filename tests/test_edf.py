@@ -1165,19 +1165,19 @@ def test_sampling_frequencies_leading_to_floating_point_issues_in_signal_duratio
 
 # fmt: off
 @pytest.mark.parametrize(
-    ("file_length_in_bytes", "num_records_in_header", "expected_warning"),
+    ("extra_bytes", "num_records_in_header", "expected_warning"),
     [
-    #    header   data_length   extra bytes     num records field    expected warning
-        (2048  +  10*18240      +1,             10,                  "Incomplete data record at the end of the EDF file"),
-        (2048  +  10*18240      +15,            11,                  "Incomplete data record at the end of the EDF file"),
-        (2048  +  10*18240      +0,             9,                   "num_data_records field does not match actual number of data records"),
-        (2048  +  10*18240      +0,             11,                  "num_data_records field does not match actual number of data records"),
+    #    extra bytes     num records field    expected warning
+        (1,              10,                  "Incomplete data record at the end of the EDF file"),
+        (15,             11,                  "Incomplete data record at the end of the EDF file"),
+        (0,              9,                   "EDF header indicates 9 data records, but file contains 10 records. Updating header."),
+        (0,              11,                  "EDF header indicates 11 data records, but file contains 10 records. Updating header."),
     ],
 )
 # fmt: on
 def test_read_edf_with_invalid_number_of_records(
     tmp_path: Path,
-    file_length_in_bytes: int,
+    extra_bytes: int,
     num_records_in_header: int,
     expected_warning: str,
 ):
@@ -1185,17 +1185,13 @@ def test_read_edf_with_invalid_number_of_records(
     copyfile(EDF_FILE, invalid_edf)
     with invalid_edf.open("rb+") as file:
         file.seek(236)
-        file.write(str(num_records_in_header).encode("us-ascii"))
-        size_delta = file_length_in_bytes - EDF_FILE.stat().st_size
-        if size_delta > 0:
+        file.write(f"{num_records_in_header: <8}".encode("ascii"))
+        if extra_bytes > 0:
             file.seek(0, 2)
-            file.write(b"\0" * size_delta)
+            file.write(b"\0" * extra_bytes)
 
     for io_obj in (invalid_edf, invalid_edf.read_bytes()):
-        with pytest.warns(
-            UserWarning,
-            match=expected_warning,
-        ):
+        with pytest.warns(UserWarning, match=expected_warning):
             edf = read_edf(io_obj)
         assert edf.num_data_records == 10
         comparison_edf = read_edf(EDF_FILE)

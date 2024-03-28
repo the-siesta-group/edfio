@@ -193,10 +193,10 @@ class Edf:
                 "Incomplete data record at the end of the EDF file. Data was truncated."
             )
         if self.num_data_records not in (-1, actual_records):
-            self._num_data_records = Edf.num_data_records.encode(actual_records)
             warnings.warn(
-                "num_data_records field does not match actual number of data records. Correcting."
+                f"EDF header indicates {self.num_data_records} data records, but file contains {actual_records} records. Updating header."
             )
+            self._num_data_records = Edf.num_data_records.encode(actual_records)
         ends = np.cumsum(lens)
         starts = ends - lens
 
