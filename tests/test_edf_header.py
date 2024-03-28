@@ -260,7 +260,7 @@ def test_setting_edf_recording_with_new_startdate_changes_both_startdate_fields(
     edf = Edf([EdfSignal(np.arange(10), 1)])
     edf.recording = Recording(startdate=new_date)
     assert edf.startdate == new_date
-    assert edf.__startdate == b"25.04.23"
+    assert edf._startdate == b"25.04.23"
     assert edf.recording.startdate == new_date
 
 
@@ -289,7 +289,7 @@ def test_setting_edf_startdate_changes_both_startdate_fields():
     edf = Edf([EdfSignal(np.arange(10), 1)])
     edf.startdate = new_date
     assert edf.startdate == new_date
-    assert edf.__startdate == b"25.04.23"
+    assert edf._startdate == b"25.04.23"
     assert edf.recording.startdate == new_date
 
 
@@ -334,7 +334,7 @@ def test_edf_startdate_warns_on_differing_startdate_fields():
         [EdfSignal(np.arange(10), 1)],
         recording=Recording(startdate=datetime.date(2023, 4, 25)),
     )
-    edf.__startdate = b"01.01.01"
+    edf._startdate = b"01.01.01"
     with pytest.warns(UserWarning, match="Different values in startdate fields"):
         edf.startdate
 

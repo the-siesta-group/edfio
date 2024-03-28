@@ -119,7 +119,7 @@ def test_edf_startdate_setter(value: datetime.date, raw: bytes):
     edf = read_edf(EDF_FILE)
     edf.startdate = value
     assert edf.startdate == value
-    assert edf.__startdate == raw
+    assert edf._startdate == raw
 
 
 def test_edf_starttime_setter():
@@ -128,7 +128,7 @@ def test_edf_starttime_setter():
     starttime = datetime.time(20, 10, 42)
     edf.starttime = starttime
     assert edf.starttime == starttime
-    assert edf.__starttime == b"20.10.42"
+    assert edf._starttime == b"20.10.42"
 
 
 def test_edf_init_minimal():
@@ -182,12 +182,12 @@ def test_edf_init_all_parameters():
     assert edf._local_recording_identification == local_recording_identification.encode(
         "ascii"
     ).ljust(80)
-    assert edf.__startdate == b"24.04.89"
-    assert edf.__starttime == b"16.13.00"
+    assert edf._startdate == b"24.04.89"
+    assert edf._starttime == b"16.13.00"
     assert edf._bytes_in_header_record == b"512".ljust(8)
     assert edf._reserved == b"".ljust(44)
-    assert edf.__data_record_duration == b"2.5".ljust(8)
-    assert edf.__num_signals == b"1".ljust(4)
+    assert edf._data_record_duration == b"2.5".ljust(8)
+    assert edf._num_signals == b"1".ljust(4)
 
 
 def test_edf_init_signals_with_different_durations():
@@ -573,7 +573,7 @@ def test_edf_slice_between_seconds_does_not_shift_legacy_startdate_when_edfplus_
     edf.slice_between_seconds(36 * 3600, 37 * 3600)
     with pytest.raises(AnonymizedDateError, match="startdate is not available"):
         edf.startdate
-    assert edf._startdate == datetime.date(1985, 1, 1)
+    assert edf._startdate == b"01.01.85"
 
 
 @pytest.mark.parametrize(("start", "stop"), [(-1, 5), (-1, 11), (5, 11)])
@@ -799,7 +799,7 @@ def test_edf_with_only_annotations_can_be_written(tmp_file: Path):
     assert edf.reserved == "EDF+C"
     assert edf.data_record_duration == 0
     assert edf.num_signals == 0
-    assert edf._num_signals == 1
+    assert edf._total_num_signals == 1
     assert edf.num_data_records == 1
     assert edf.annotations == annotations
 
@@ -819,7 +819,7 @@ def test_get_starttime_from_file_with_reserved_field_indicating_edfplus_but_no_a
 ):
     starttime = datetime.time(22, 33, 44)
     edf = Edf([EdfSignal(np.arange(2), 1)], starttime=starttime)
-    edf._reserved = Edf.reserved.encode("EDF+C")
+    edf._reserved = b"EDF+C".ljust(44)
     edf.write(tmp_file)
     assert read_edf(tmp_file).starttime == starttime
 

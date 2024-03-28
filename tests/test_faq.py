@@ -141,7 +141,7 @@ def test_q11_read_non_standard_ascii_characters_in_header(tmp_file: Path):
 
 def test_q11_num_data_records_not_specified(tmp_file: Path):
     edf = Edf(signals=[EdfSignal(np.arange(10), 1)])
-    edf._num_data_records = Edf.num_data_records.encode(-1)
+    edf._num_data_records = b"-1      "
     with pytest.warns(UserWarning, match="num_data_records=-1, determining correct"):
         edf.write(tmp_file)
     edf = read_edf(tmp_file)

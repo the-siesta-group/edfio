@@ -4,7 +4,6 @@ import datetime
 import math
 import re
 from abc import ABC, abstractmethod
-from collections.abc import Iterator
 from typing import Any, Generic, TypeVar, overload
 
 T = TypeVar("T", str, int, float, datetime.date, datetime.time)
@@ -52,6 +51,38 @@ def decode_float(field: bytes) -> float:
     if math.isinf(value):
         raise ValueError(f"Field value is outside float range: {decode_str(field)}")
     return value
+
+
+def decode_date(field: bytes) -> datetime.date:
+    date = decode_str(field)
+    match = DATE_OR_TIME_PATTERN.fullmatch(date)
+    if match is None:
+        raise ValueError(f"Invalid date for format DD.MM.YY: {date!r}")
+    day, month, year = (int(g) for g in match.groups())
+    if year >= 85:  # noqa: PLR2004
+        year += 1900
+    else:
+        year += 2000
+    return datetime.date(year, month, day)
+
+
+def encode_date(value: datetime.date) -> bytes:
+    if not 1985 <= value.year <= 2084:  # noqa: PLR2004
+        raise ValueError("EDF only allows dates from 1985 to 2084")
+    return encode_str(value.strftime("%d.%m.%y"), 8)
+
+
+def decode_time(field: bytes) -> datetime.time:
+    time = decode_str(field)
+    match = DATE_OR_TIME_PATTERN.fullmatch(time)
+    if match is None:
+        raise ValueError(f"Invalid time for format hh.mm.ss: {time!r}")
+    hours, minutes, seconds = (int(g) for g in match.groups())
+    return datetime.time(hours, minutes, seconds)
+
+
+def encode_time(value: datetime.time) -> bytes:
+    return encode_str(value.isoformat().replace(":", "."), 8)
 
 
 class RawHeaderField(ABC, Generic[T]):
@@ -157,9 +188,3 @@ class RawHeaderFieldTime(RawHeaderField[datetime.time]):
 
     def encode(self, value: datetime.time) -> bytes:
         return encode_str(value.isoformat().replace(":", "."), self.length)
-
-
-def get_header_fields(cls: type) -> Iterator[tuple[str, int]]:
-    for name, value in cls.__dict__.items():
-        if isinstance(value, RawHeaderField):
-            yield name, value.length
