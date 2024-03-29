@@ -114,7 +114,7 @@ def test_edf_signal_init_all_parameters():
 )
 def test_edf_signal_field_cannot_be_set_publicly(field_name: str):
     signal = EdfSignal(np.arange(10), 1)
-    with pytest.raises(AttributeError, match="can't set attribute"):
+    with pytest.raises(AttributeError, match="can't set attribute|has no setter"):
         setattr(signal, field_name, None)
 
 
