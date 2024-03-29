@@ -13,11 +13,11 @@ from edfio import (
     read_edf,
 )
 from edfio.edf_annotations import (
-    _create_annotations_signal,
     _EdfAnnotationsDataRecord,
     _encode_annotation_duration,
     _encode_annotation_onset,
 )
+from edfio.edf_signal import EdfAnnotationsSignal
 from tests import TEST_DATA_DIR
 
 MNE_TEST_FILE = TEST_DATA_DIR / "mne_test.edf"
@@ -289,7 +289,7 @@ def test_edf_annotations_multiple_annotation_signals():
     edf = Edf(
         signals=[
             EdfSignal(np.arange(2), sampling_frequency=1),
-            _create_annotations_signal(
+            EdfAnnotationsSignal(
                 [
                     EdfAnnotation(0, None, "sig 1 ann 1"),
                     EdfAnnotation(0.5, None, "sig 1 ann 2"),
@@ -297,7 +297,7 @@ def test_edf_annotations_multiple_annotation_signals():
                 num_data_records=2,
                 data_record_duration=1,
             ),
-            _create_annotations_signal(
+            EdfAnnotationsSignal(
                 [
                     EdfAnnotation(0.25, None, "sig 2 ann 1"),
                     EdfAnnotation(0.75, None, "sig 2 ann 2"),
@@ -389,7 +389,7 @@ def test_starttime_raises_helpful_error_for_invalid_timestamp_annotation():
     edf = Edf(
         [
             EdfSignal(np.arange(1), 1),
-            _create_annotations_signal(
+            EdfAnnotationsSignal(
                 [EdfAnnotation(2.345, None, "")],
                 num_data_records=1,
                 data_record_duration=1,

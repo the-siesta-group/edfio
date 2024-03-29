@@ -27,7 +27,6 @@ from edfio._header_field import (
 )
 from edfio.edf_annotations import (
     EdfAnnotation,
-    _create_annotations_signal,
     _EdfAnnotationsDataRecord,
 )
 from edfio.edf_header import (
@@ -36,7 +35,7 @@ from edfio.edf_header import (
     Recording,
     _encode_edfplus_date,
 )
-from edfio.edf_signal import EdfSignal
+from edfio.edf_signal import AbstractEdfSignal, EdfAnnotationsSignal, EdfSignal
 
 
 class Edf:
@@ -142,17 +141,20 @@ class Edf:
         if starttime.microsecond and annotations is None:
             warnings.warn("Creating EDF+C to store microsecond starttime.")
         if annotations is not None or starttime.microsecond:
-            signals = (
-                *signals,
-                _create_annotations_signal(
-                    annotations if annotations is not None else (),
-                    num_data_records=self.num_data_records,
-                    data_record_duration=self.data_record_duration,
-                    subsecond_offset=starttime.microsecond / 1_000_000,
-                ),
+            self._set_signals(
+                (
+                    *signals,
+                    EdfAnnotationsSignal(
+                        annotations if annotations is not None else (),
+                        num_data_records=self.num_data_records,
+                        data_record_duration=self.data_record_duration,
+                        subsecond_offset=starttime.microsecond / 1_000_000,
+                    ),
+                )
             )
             self._reserved = Edf.reserved.encode("EDF+C")
-        self._set_signals(signals)
+        else:
+            self._set_signals(signals)
 
     def __repr__(self) -> str:
         signals_text = f"{len(self.signals)} signal"
@@ -196,9 +198,11 @@ class Edf:
         or replaced by modifying this property. Use :meth:`Edf.append_signals`,
         :meth:`Edf.drop_signals`, or :attr:`EdfSignal.data`, respectively.
         """
-        return tuple(s for s in self._signals if s.label != "EDF Annotations")
+        return tuple(
+            s for s in self._signals if not isinstance(s, EdfAnnotationsSignal)
+        )
 
-    def _set_signals(self, signals: Sequence[EdfSignal]) -> None:
+    def _set_signals(self, signals: Sequence[EdfSignal | EdfAnnotationsSignal]) -> None:
         signals = tuple(signals)
         self._set_num_data_records_with_signals(signals)
         self._signals = signals
@@ -206,12 +210,12 @@ class Edf:
             256 * (len(signals) + 1)
         )
         self._num_signals = len(signals)
-        if all(s.label == "EDF Annotations" for s in signals):
+        if all(isinstance(s, EdfAnnotationsSignal) for s in signals):
             self._data_record_duration = 0
 
     def _set_num_data_records_with_signals(
         self,
-        signals: Sequence[EdfSignal],
+        signals: Sequence[EdfSignal | EdfAnnotationsSignal],
     ) -> None:
         if not signals:
             num_data_records = 1
@@ -234,10 +238,12 @@ class Edf:
                 )
         self._num_data_records = Edf.num_data_records.encode(num_data_records)
 
-    def _parse_signal_headers(self, raw_signal_headers: bytes) -> tuple[EdfSignal, ...]:
+    def _parse_signal_headers(
+        self, raw_signal_headers: bytes
+    ) -> tuple[EdfSignal | EdfAnnotationsSignal, ...]:
         raw_headers_split: dict[str, list[bytes]] = {}
         start = 0
-        for header_name, length in get_header_fields(EdfSignal):
+        for header_name, length in get_header_fields(AbstractEdfSignal):
             end = start + length * self._num_signals
             raw_header = raw_signal_headers[start:end]
             raw_headers_split[header_name] = [
@@ -258,7 +264,9 @@ class Edf:
                 if raw_signal_header["_label"].rstrip() == b"EDF Annotations":
                     sampling_frequency = 0
             signals.append(
-                EdfSignal._from_raw_header(sampling_frequency, **raw_signal_header)
+                AbstractEdfSignal._from_raw_header(
+                    sampling_frequency, **raw_signal_header
+                )
             )
         return tuple(signals)
 
@@ -280,13 +288,13 @@ class Edf:
         else:
             num_data_records = self.num_data_records
         for signal in self._signals:
-            signal._samples_per_data_record = EdfSignal.samples_per_data_record.encode(  # type: ignore[attr-defined]
+            signal._samples_per_data_record = AbstractEdfSignal.samples_per_data_record.encode(  # type: ignore[attr-defined]
                 len(signal._digital) // num_data_records
             )
         header_records = []
         for header_name, _ in get_header_fields(Edf):
             header_records.append(getattr(self, "_" + header_name))
-        for header_name, _ in get_header_fields(EdfSignal):
+        for header_name, _ in get_header_fields(AbstractEdfSignal):
             for signal in self._signals:
                 header_records.append(getattr(signal, "_" + header_name))
         header_record = b"".join(header_records)
@@ -552,7 +560,7 @@ class Edf:
     ) -> None:
         signals = list(self._signals)
         for idx, signal in enumerate(self._signals):
-            if signal not in self._annotation_signals:
+            if not isinstance(signal, EdfAnnotationsSignal):
                 continue
             annotations = []
             for data_record in signal._digital.reshape(
@@ -563,7 +571,7 @@ class Edf:
                     annotations.extend(annot_dr.annotations[1:])
                 else:
                     annotations.extend(annot_dr.annotations)
-            signals[idx] = _create_annotations_signal(
+            signals[idx] = EdfAnnotationsSignal(
                 [
                     EdfAnnotation(a.onset - self._subsecond_offset, a.duration, a.text)
                     for a in annotations
@@ -621,11 +629,11 @@ class Edf:
         """
         if isinstance(drop, str):
             drop = [drop]
-        selected: list[EdfSignal] = []
+        selected: list[EdfSignal | EdfAnnotationsSignal] = []
         dropped: list[int | str] = []
         i = 0
         for signal in self._signals:
-            if signal.label == "EDF Annotations":
+            if isinstance(signal, EdfAnnotationsSignal):
                 selected.append(signal)
                 continue
             if i in drop or signal.label in drop:
@@ -660,7 +668,7 @@ class Edf:
             new_signals = [new_signals]
         last_ordinary_index = 0
         for i, signal in enumerate(self._signals):
-            if signal.label != "EDF Annotations":
+            if not isinstance(signal, EdfAnnotationsSignal):
                 last_ordinary_index = i
         self._set_signals(
             [
@@ -671,11 +679,15 @@ class Edf:
         )
 
     @property
-    def _annotation_signals(self) -> Iterable[EdfSignal]:
-        return (signal for signal in self._signals if signal.label == "EDF Annotations")
+    def _annotation_signals(self) -> Iterable[EdfAnnotationsSignal]:
+        return (
+            signal
+            for signal in self._signals
+            if isinstance(signal, EdfAnnotationsSignal)
+        )
 
     @property
-    def _timekeeping_signal(self) -> EdfSignal:
+    def _timekeeping_signal(self) -> EdfAnnotationsSignal:
         return next(iter(self._annotation_signals))
 
     @property
@@ -773,7 +785,7 @@ class Edf:
         keep_all_annotations : bool, default: False
             If set to `True`, annotations outside the selected time interval are kept.
         """
-        signals: list[EdfSignal] = []
+        signals: list[EdfSignal | EdfAnnotationsSignal] = []
         self._verify_seconds_inside_recording_time(start)
         self._verify_seconds_inside_recording_time(stop)
         self._verify_seconds_coincide_with_sample_time(start)
@@ -782,7 +794,7 @@ class Edf:
             int((stop - start) / self.data_record_duration)
         )
         for signal in self._signals:
-            if signal.label == "EDF Annotations":
+            if isinstance(signal, EdfAnnotationsSignal):
                 signals.append(
                     self._slice_annotations_signal(
                         signal,
@@ -883,12 +895,12 @@ class Edf:
 
     def _slice_annotations_signal(
         self,
-        signal: EdfSignal,
+        signal: EdfAnnotationsSignal,
         *,
         start: float,
         stop: float,
         keep_all_annotations: bool,
-    ) -> EdfSignal:
+    ) -> EdfAnnotationsSignal:
         is_timekeeping_signal = signal == self._timekeeping_signal
         annotations: list[EdfAnnotation] = []
         for data_record in signal._digital.reshape(
@@ -904,7 +916,7 @@ class Edf:
             for a in annotations
             if keep_all_annotations or start <= a.onset < stop
         ]
-        return _create_annotations_signal(
+        return EdfAnnotationsSignal(
             annotations,
             num_data_records=self.num_data_records,
             data_record_duration=self.data_record_duration,

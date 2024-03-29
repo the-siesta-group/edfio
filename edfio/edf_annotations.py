@@ -1,13 +1,8 @@
 from __future__ import annotations
 
 import re
-from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import NamedTuple
-
-import numpy as np
-
-from edfio.edf_signal import EdfSignal
 
 _ANNOTATIONS_PATTERN = re.compile(
     """
@@ -52,54 +47,6 @@ class EdfAnnotation(NamedTuple):
     onset: float
     duration: float | None
     text: str
-
-
-def _create_annotations_signal(
-    annotations: Iterable[EdfAnnotation],
-    *,
-    num_data_records: int,
-    data_record_duration: float,
-    with_timestamps: bool = True,
-    subsecond_offset: float = 0,
-) -> EdfSignal:
-    data_record_starts = np.arange(num_data_records) * data_record_duration
-    annotations = sorted(annotations)
-    data_records = []
-    for i, start in enumerate(data_record_starts):
-        end = start + data_record_duration
-        tals: list[_EdfTAL] = []
-        if with_timestamps:
-            tals.append(_EdfTAL(np.round(start + subsecond_offset, 12), None, [""]))
-        for ann in annotations:
-            if (
-                (i == 0 and ann.onset < 0)
-                or (i == (num_data_records - 1) and end <= ann.onset)
-                or (start <= ann.onset < end)
-            ):
-                tals.append(
-                    _EdfTAL(
-                        np.round(ann.onset + subsecond_offset, 12),
-                        ann.duration,
-                        [ann.text],
-                    )
-                )
-        data_records.append(_EdfAnnotationsDataRecord(tals).to_bytes())
-    maxlen = max(len(data_record) for data_record in data_records)
-    if maxlen % 2:
-        maxlen += 1
-    raw = b"".join(dr.ljust(maxlen, b"\x00") for dr in data_records)
-    divisor = data_record_duration if data_record_duration else 1
-    signal = EdfSignal(
-        np.arange(1.0),  # placeholder signal, as argument `data` is non-optional
-        sampling_frequency=maxlen // 2 / divisor,
-        physical_range=(-32768, 32767),
-    )
-    signal._label = "EDF Annotations"
-    signal._samples_per_data_record = EdfSignal.samples_per_data_record.encode(  # type: ignore[attr-defined]
-        maxlen // 2
-    )
-    signal._digital = np.frombuffer(raw, dtype=np.int16).copy()
-    return signal
 
 
 @dataclass

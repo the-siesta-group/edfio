@@ -119,7 +119,7 @@ def test_edf_signal_field_cannot_be_set_publicly(field_name: str):
 
 
 EDFSIGNAL_SETTER_TEST_FIELDS = [
-    ("_label", 16, "EEG FPz-Cz"),
+    ("label", 16, "EEG FPz-Cz"),
     ("transducer_type", 80, "AgAgCl electrode"),
     ("physical_dimension", 8, "uV"),
     ("prefiltering", 80, "HP:0.1Hz LP:75Hz"),
@@ -154,14 +154,13 @@ def test_edfsignal_setter_sets_raw_data_fields(
 ):
     setattr(dummy_edf_signal, field_name, value)
     assert getattr(dummy_edf_signal, field_name) == value
-    assert getattr(dummy_edf_signal, "_" + field_name) == str(value).ljust(
+    assert getattr(dummy_edf_signal, "__" + field_name) == str(value).ljust(
         field_length
     ).encode("ascii")
 
 
 def test_edf_signal_samples_per_data_record_not_set(dummy_edf_signal: EdfSignal):
-    with pytest.raises(AttributeError, match="no attribute '_samples_per_data_record'"):
-        dummy_edf_signal.samples_per_data_record
+    assert dummy_edf_signal.samples_per_data_record == -1
 
 
 @pytest.mark.parametrize(
@@ -181,13 +180,13 @@ def test_edf_signal_from_raw_header_has_no_data_by_default():
     sig = EdfSignal._from_raw_header(
         20,
         _label=b"".ljust(16),
-        transducer_type=b"".ljust(80),
-        physical_dimension=b"".ljust(8),
+        _transducer_type=b"".ljust(80),
+        _physical_dimension=b"".ljust(8),
         physical_min=b"-500".ljust(8),
         physical_max=b"500".ljust(8),
         digital_min=b"-2048".ljust(8),
         digital_max=b"2047".ljust(8),
-        prefiltering=b"".ljust(80),
+        _prefiltering=b"".ljust(80),
         samples_per_data_record=b"1".ljust(8),
         reserved=b"".ljust(32),
     )

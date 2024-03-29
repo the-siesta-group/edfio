@@ -14,13 +14,13 @@ from edfio import (
     AnonymizedDateError,
     Edf,
     EdfAnnotation,
+    EdfAnnotationsSignal,
     EdfSignal,
     Patient,
     Recording,
     read_edf,
 )
 from edfio.edf import _calculate_num_data_records
-from edfio.edf_annotations import _create_annotations_signal
 from edfio.edf_signal import _FloatRange
 from tests import TEST_DATA_DIR
 
@@ -698,7 +698,7 @@ def test_edf_slice_between_annotations_works_for_multiple_annotation_signals():
     edf = Edf(
         [
             EdfSignal(np.zeros(10), 1),
-            _create_annotations_signal(
+            EdfAnnotationsSignal(
                 [
                     EdfAnnotation(2, None, "task start"),
                     EdfAnnotation(5, None, "something"),
@@ -706,7 +706,7 @@ def test_edf_slice_between_annotations_works_for_multiple_annotation_signals():
                 num_data_records=10,
                 data_record_duration=1,
             ),
-            _create_annotations_signal(
+            EdfAnnotationsSignal(
                 [
                     EdfAnnotation(4, None, "something else"),
                     EdfAnnotation(8, None, "task end"),
@@ -828,14 +828,14 @@ def test_drop_signals_keeps_position_of_annotation_signals():
         signals=[
             EdfSignal(np.arange(2), 1, label="EEG 1"),
             EdfSignal(np.arange(2), 1, label="EEG 2"),
-            _create_annotations_signal(
+            EdfAnnotationsSignal(
                 [EdfAnnotation(0, None, "ann 1")],
                 num_data_records=2,
                 data_record_duration=1,
             ),
             EdfSignal(np.arange(2), 1, label="EEG 3"),
             EdfSignal(np.arange(2), 1, label="EEG 4"),
-            _create_annotations_signal(
+            EdfAnnotationsSignal(
                 [EdfAnnotation(0.25, None, "ann 2")],
                 num_data_records=2,
                 data_record_duration=1,
@@ -892,11 +892,11 @@ def test_append_signals_appends_after_last_ordinary_signal():
         [
             EdfSignal(np.arange(3), 1, label="S1"),
             EdfSignal(np.arange(3), 1, label="S2"),
-            _create_annotations_signal(
+            EdfAnnotationsSignal(
                 (), data_record_duration=1, num_data_records=3, with_timestamps=True
             ),
             EdfSignal(np.arange(3), 1, label="S3"),
-            _create_annotations_signal(
+            EdfAnnotationsSignal(
                 (), data_record_duration=1, num_data_records=3, with_timestamps=True
             ),
         ]
@@ -1061,13 +1061,13 @@ def test_update_data_record_duration_with_multiple_annotations_signals(tmp_file:
     edf = Edf(
         [
             EdfSignal(expected_data, 10, physical_range=(0, 29), digital_range=(0, 29)),
-            _create_annotations_signal(
+            EdfAnnotationsSignal(
                 expected_annotations1,
                 data_record_duration=1,
                 num_data_records=3,
                 with_timestamps=True,
             ),
-            _create_annotations_signal(
+            EdfAnnotationsSignal(
                 expected_annotations2,
                 data_record_duration=1,
                 num_data_records=3,
