@@ -478,8 +478,8 @@ class Edf:
             if maxlen % 2:
                 maxlen += 1
             raw = b"".join(dr.ljust(maxlen, b"\x00") for dr in data_records)
-            timekeeping_signal._samples_per_data_record = EdfSignal.samples_per_data_record.encode(  # type: ignore[attr-defined]
-                maxlen // 2
+            timekeeping_signal._samples_per_data_record = (  # type: ignore[attr-defined]
+                EdfSignal.samples_per_data_record.encode(maxlen // 2)
             )
             timekeeping_signal._sampling_frequency = (
                 maxlen // 2 * self.data_record_duration
