@@ -115,7 +115,7 @@ class EdfSignal:
         self.transducer_type = transducer_type
         self.physical_dimension = physical_dimension
         self.prefiltering = prefiltering
-        self._reserved = encode_str("", 32)
+        self._set_reserved("")
         if not np.all(np.isfinite(data)):
             raise ValueError("Signal data must contain only finite values")
         self._set_physical_range(physical_range, data)
@@ -154,7 +154,7 @@ class EdfSignal:
         sig._digital_min = digital_min
         sig._digital_max = digital_max
         sig._prefiltering = prefiltering
-        sig._samples_per_data_record = samples_per_data_record  # type: ignore[attr-defined]
+        sig._samples_per_data_record = samples_per_data_record
         sig._reserved = reserved
         return sig
 
@@ -201,6 +201,12 @@ class EdfSignal:
             physical_range=(0, 9),
             digital_range=(0, 9),
         )
+
+    def _set_samples_per_data_record(self, samples_per_data_record: int) -> None:
+        self._samples_per_data_record = encode_int(samples_per_data_record, 8)
+
+    def _set_reserved(self, reserved: str) -> None:
+        self._reserved = encode_str(reserved, 32)
 
     @property
     def label(self) -> str:
@@ -268,7 +274,7 @@ class EdfSignal:
         For newly instantiated :class:`EdfSignal` objects, this is only set once
         :meth:`Edf.write` is called.
         """
-        return int(decode_str(self._samples_per_data_record))  # type: ignore[attr-defined]
+        return int(decode_str(self._samples_per_data_record))
 
     @property
     def reserved(self) -> str:
