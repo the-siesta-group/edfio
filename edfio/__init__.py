@@ -3,7 +3,12 @@ from edfio.edf_annotations import EdfAnnotation
 from edfio.edf_header import AnonymizedDateError, Patient, Recording
 from edfio.edf_signal import EdfSignal
 
-__version__ = "0.0.0"
+try:
+    from importlib.metadata import version
+
+    __version__ = version("edfio")
+except Exception:
+    __version__ = "0.0.0"
 
 
 __all__ = [
