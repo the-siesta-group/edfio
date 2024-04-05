@@ -81,4 +81,4 @@ pretty = true
 packages = ["edfio"]
 
 [tool.coverage.report]
-exclude_lines = ["@abstractmethod", "@overload"]
+exclude_also = ["@abstractmethod", "@overload"]
