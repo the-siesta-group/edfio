@@ -18,12 +18,15 @@ from typing import Any, Literal
 import numpy as np
 
 from edfio._header_field import (
-    RawHeaderFieldDate,
-    RawHeaderFieldFloat,
-    RawHeaderFieldInt,
-    RawHeaderFieldStr,
-    RawHeaderFieldTime,
-    get_header_fields,
+    decode_date,
+    decode_float,
+    decode_str,
+    decode_time,
+    encode_date,
+    encode_float,
+    encode_int,
+    encode_str,
+    encode_time,
 )
 from edfio.edf_annotations import (
     EdfAnnotation,
@@ -77,34 +80,19 @@ class Edf:
         `None`, an EDF+C file is created.
     """
 
-    version = RawHeaderFieldInt(8)
-    """EDF version, always `0`"""
-    local_patient_identification = RawHeaderFieldStr(80, is_settable=True)
-    """
-    Unparsed string representation of the legacy local patient identification.
-
-    See also
-    --------
-    patient: Parsed representation, as a :class:`Patient` object.
-    """
-    local_recording_identification = RawHeaderFieldStr(80, is_settable=True)
-    """
-    Unparsed string representation of the legacy local recording identification.
-
-    See also
-    --------
-    recording: Parsed representation, as a :class:`Recording` object.
-    """
-    _startdate = RawHeaderFieldDate(8, is_settable=True)
-    _starttime = RawHeaderFieldTime(8, is_settable=True)
-    bytes_in_header_record = RawHeaderFieldInt(8)
-    """Number of bytes in the header record."""
-    reserved = RawHeaderFieldStr(44)
-    """`"EDF+C"` for an EDF+C file, else `""`."""
-    num_data_records = RawHeaderFieldInt(8)
-    """Number of data records in the recording."""
-    _data_record_duration = RawHeaderFieldFloat(8, is_settable=True)
-    _num_signals = RawHeaderFieldInt(4, is_settable=True)
+    _header_fields = (
+        ("version", 8),
+        ("local_patient_identification", 80),
+        ("local_recording_identification", 80),
+        ("startdate", 8),
+        ("starttime", 8),
+        ("bytes_in_header_record", 8),
+        ("reserved", 44),
+        ("num_data_records", 8),
+        ("data_record_duration", 8),
+        ("num_signals", 4),
+    )
+    _signals: tuple[EdfSignal, ...]
 
     def __init__(
         self,
@@ -131,14 +119,14 @@ class Edf:
                 "Data record duration must be zero for annotation-only files"
             )
 
-        self._data_record_duration = data_record_duration
+        self._set_data_record_duration(data_record_duration)
         self._set_num_data_records_with_signals(signals)
-        self._version = Edf.version.encode(0)
+        self._set_version(0)
         self.local_patient_identification = patient._to_str()
         self.local_recording_identification = recording._to_str()
         self._set_startdate_with_recording(recording)
-        self._starttime = starttime.replace(microsecond=0)
-        self._reserved = Edf.reserved.encode("")
+        self._starttime = encode_time(starttime.replace(microsecond=0))
+        self._set_reserved("")
         if starttime.microsecond and annotations is None:
             warnings.warn("Creating EDF+C to store microsecond starttime.")
         if annotations is not None or starttime.microsecond:
@@ -151,7 +139,7 @@ class Edf:
                     subsecond_offset=starttime.microsecond / 1_000_000,
                 ),
             )
-            self._reserved = Edf.reserved.encode("EDF+C")
+            self._set_reserved("EDF+C")
         self._set_signals(signals)
 
     def __repr__(self) -> str:
@@ -162,6 +150,59 @@ class Edf:
         if len(self.annotations) != 1:
             annotations_text += "s"
         return f"<Edf {signals_text} {annotations_text}>"
+
+    def _set_version(self, version: int) -> None:
+        self._version = encode_int(version, 8)
+
+    def _set_bytes_in_header_record(self, bytes_in_header_record: int) -> None:
+        self._bytes_in_header_record = encode_int(bytes_in_header_record, 8)
+
+    def _set_reserved(self, reserved: str) -> None:
+        self._reserved = encode_str(reserved, 44)
+
+    def _set_num_data_records(self, num_data_records: int) -> None:
+        self._num_data_records = encode_int(num_data_records, 8)
+
+    def _set_data_record_duration(self, data_record_duration: float) -> None:
+        self._data_record_duration = encode_float(data_record_duration)
+
+    def _set_num_signals(self, num_signals: int) -> None:
+        self._num_signals = encode_int(num_signals, 4)
+
+    @property
+    def version(self) -> int:
+        """EDF version, always `0`."""
+        return int(decode_str(self._version))
+
+    @property
+    def local_patient_identification(self) -> str:
+        """
+        Unparsed string representation of the legacy local patient identification.
+
+        See Also
+        --------
+        patient: Parsed representation, as a :class:`Patient` object.
+        """
+        return decode_str(self._local_patient_identification)
+
+    @local_patient_identification.setter
+    def local_patient_identification(self, value: str) -> None:
+        self._local_patient_identification = encode_str(value, 80)
+
+    @property
+    def local_recording_identification(self) -> str:
+        """
+        Unparsed string representation of the legacy local recording identification.
+
+        See Also
+        --------
+        recording: Parsed representation, as a :class:`Recording` object.
+        """
+        return decode_str(self._local_recording_identification)
+
+    @local_recording_identification.setter
+    def local_recording_identification(self, value: str) -> None:
+        self._local_recording_identification = encode_str(value, 80)
 
     def _load_data(self, file: Path | io.BufferedReader | io.BytesIO) -> None:
         lens = [signal.samples_per_data_record for signal in self._signals]
@@ -196,7 +237,7 @@ class Edf:
             warnings.warn(
                 f"EDF header indicates {self.num_data_records} data records, but file contains {actual_records} records. Updating header."
             )
-            self._num_data_records = Edf.num_data_records.encode(actual_records)
+            self._set_num_data_records(actual_records)
         ends = np.cumsum(lens)
         starts = ends - lens
 
@@ -204,9 +245,11 @@ class Edf:
             signal._digital = datarecords[:, start:end].flatten()
 
     def _read_header(self, buffer: io.BufferedReader | io.BytesIO) -> None:
-        for header_name, length in get_header_fields(Edf):
+        for header_name, length in Edf._header_fields:
             setattr(self, "_" + header_name, buffer.read(length))
-        self._signals = self._parse_signal_headers(buffer.read(256 * self._num_signals))
+        self._signals = self._parse_signal_headers(
+            buffer.read(256 * self._total_num_signals)
+        )
 
     @property
     def signals(self) -> tuple[EdfSignal, ...]:
@@ -223,12 +266,10 @@ class Edf:
         signals = tuple(signals)
         self._set_num_data_records_with_signals(signals)
         self._signals = signals
-        self._bytes_in_header_record = Edf.bytes_in_header_record.encode(
-            256 * (len(signals) + 1)
-        )
-        self._num_signals = len(signals)
+        self._set_bytes_in_header_record(256 * (len(signals) + 1))
+        self._set_num_signals(len(signals))
         if all(s.label == "EDF Annotations" for s in signals):
-            self._data_record_duration = 0
+            self._set_data_record_duration(0)
 
     def _set_num_data_records_with_signals(
         self,
@@ -253,20 +294,20 @@ class Edf:
                 raise ValueError(
                     f"Not all signal lengths can be split into {num_data_records} data records: {signal_lengths}"
                 )
-        self._num_data_records = Edf.num_data_records.encode(num_data_records)
+        self._set_num_data_records(num_data_records)
 
     def _parse_signal_headers(self, raw_signal_headers: bytes) -> tuple[EdfSignal, ...]:
         raw_headers_split: dict[str, list[bytes]] = {}
         start = 0
-        for header_name, length in get_header_fields(EdfSignal):
-            end = start + length * self._num_signals
+        for header_name, length in EdfSignal._header_fields:
+            end = start + length * self._total_num_signals
             raw_header = raw_signal_headers[start:end]
             raw_headers_split[header_name] = [
                 raw_header[i : length + i] for i in range(0, len(raw_header), length)
             ]
             start = end
         signals = []
-        for i in range(self._num_signals):
+        for i in range(self._total_num_signals):
             raw_signal_header = {
                 key: raw_headers_split[key][i] for key in raw_headers_split
             }
@@ -276,7 +317,7 @@ class Edf:
                     / self.data_record_duration
                 )
             except ZeroDivisionError:
-                if raw_signal_header["_label"].rstrip() == b"EDF Annotations":
+                if raw_signal_header["label"].rstrip() == b"EDF Annotations":
                     sampling_frequency = 0
             signals.append(
                 EdfSignal._from_raw_header(sampling_frequency, **raw_signal_header)
@@ -301,13 +342,13 @@ class Edf:
         else:
             num_data_records = self.num_data_records
         for signal in self._signals:
-            signal._samples_per_data_record = EdfSignal.samples_per_data_record.encode(  # type: ignore[attr-defined]
+            signal._set_samples_per_data_record(
                 len(signal._digital) // num_data_records
             )
         header_records = []
-        for header_name, _ in get_header_fields(Edf):
+        for header_name, _ in Edf._header_fields:
             header_records.append(getattr(self, "_" + header_name))
-        for header_name, _ in get_header_fields(EdfSignal):
+        for header_name, _ in EdfSignal._header_fields:
             for signal in self._signals:
                 header_records.append(getattr(signal, "_" + header_name))
         header_record = b"".join(header_records)
@@ -409,21 +450,22 @@ class Edf:
         is preferred. Raises an `AnonymizedDateError` if the EDF+ field is anonymized
         (i.e., begins with `Startdate X`).
         """
+        legacy_startdate = decode_date(self._startdate)
         with contextlib.suppress(Exception):
-            if self._startdate != self.recording.startdate:
+            if legacy_startdate != self.recording.startdate:
                 warnings.warn(
-                    f"Different values in startdate fields: {self._startdate}, {self.recording.startdate}"
+                    f"Different values in startdate fields: {legacy_startdate}, {self.recording.startdate}"
                 )
         try:
             return self.recording.startdate
         except AnonymizedDateError:
             raise
         except ValueError:
-            return self._startdate
+            return legacy_startdate
 
     @startdate.setter
     def startdate(self, startdate: datetime.date) -> None:
-        self._startdate = startdate
+        self._startdate = encode_date(startdate)
         try:
             self.recording.startdate  # noqa: B018
         except AnonymizedDateError:
@@ -452,7 +494,7 @@ class Edf:
         """
         subsecond_offset = self._subsecond_offset
         try:
-            return self._starttime.replace(
+            return decode_time(self._starttime).replace(
                 microsecond=round(subsecond_offset * 1000000)
             )
         except ValueError as e:
@@ -463,7 +505,7 @@ class Edf:
     @starttime.setter
     def starttime(self, starttime: datetime.time) -> None:
         onset_change = starttime.microsecond / 1000000 - self._subsecond_offset
-        self._starttime = starttime.replace(microsecond=0)
+        self._starttime = encode_time(starttime.replace(microsecond=0))
         if starttime.microsecond != self.starttime.microsecond:
             timekeeping_signal = self._timekeeping_signal
             data_records = []
@@ -478,9 +520,7 @@ class Edf:
             if maxlen % 2:
                 maxlen += 1
             raw = b"".join(dr.ljust(maxlen, b"\x00") for dr in data_records)
-            timekeeping_signal._samples_per_data_record = (  # type: ignore[attr-defined]
-                EdfSignal.samples_per_data_record.encode(maxlen // 2)
-            )
+            timekeeping_signal._set_samples_per_data_record(maxlen // 2)
             timekeeping_signal._sampling_frequency = (
                 maxlen // 2 * self.data_record_duration
             )
@@ -488,14 +528,30 @@ class Edf:
 
     def _set_startdate_with_recording(self, recording: Recording) -> None:
         try:
-            self._startdate = recording.startdate
+            startdate = recording.startdate
         except AnonymizedDateError:
-            self._startdate = datetime.date(1985, 1, 1)
+            startdate = datetime.date(1985, 1, 1)
+        self._startdate = encode_date(startdate)
+
+    @property
+    def bytes_in_header_record(self) -> int:
+        """Number of bytes in the header record."""
+        return int(decode_str(self._bytes_in_header_record))
+
+    @property
+    def reserved(self) -> str:
+        """`"EDF+C"` for an EDF+C file, else `""`."""
+        return decode_str(self._reserved)
+
+    @property
+    def num_data_records(self) -> int:
+        """Number of data records in the recording."""
+        return int(decode_str(self._num_data_records))
 
     @property
     def data_record_duration(self) -> float:
         """Duration of each data record in seconds."""
-        return self._data_record_duration
+        return decode_float(self._data_record_duration)
 
     def update_data_record_duration(
         self,
@@ -543,8 +599,12 @@ class Edf:
         self._update_record_duration_in_annotation_signals(
             data_record_duration, num_data_records
         )
-        self._data_record_duration = data_record_duration
-        self._num_data_records = Edf.num_data_records.encode(num_data_records)
+        self._set_data_record_duration(data_record_duration)
+        self._set_num_data_records(num_data_records)
+
+    @property
+    def _total_num_signals(self) -> int:
+        return int(decode_str(self._num_signals))
 
     @property
     def num_signals(self) -> int:
@@ -658,10 +718,8 @@ class Edf:
         if not_dropped := set(drop) - set(dropped):
             raise ValueError(f"No signal found with index/label {not_dropped}")
         self._signals = tuple(selected)
-        self._bytes_in_header_record = Edf.bytes_in_header_record.encode(
-            256 * (len(selected) + 1)
-        )
-        self._num_signals = len(selected)
+        self._set_bytes_in_header_record(256 * (len(selected) + 1))
+        self._set_num_signals(len(selected))
 
     def append_signals(self, new_signals: EdfSignal | Iterable[EdfSignal]) -> None:
         """
@@ -799,9 +857,7 @@ class Edf:
         self._verify_seconds_inside_recording_time(stop)
         self._verify_seconds_coincide_with_sample_time(start)
         self._verify_seconds_coincide_with_sample_time(stop)
-        self._num_data_records = Edf.num_data_records.encode(
-            int((stop - start) / self.data_record_duration)
-        )
+        self._set_num_data_records(int((stop - start) / self.data_record_duration))
         for signal in self._signals:
             if signal.label == "EDF Annotations":
                 signals.append(

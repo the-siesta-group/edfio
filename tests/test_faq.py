@@ -9,11 +9,7 @@ import numpy as np
 import pytest
 
 from edfio import Edf, EdfSignal, read_edf
-from edfio._header_field import (
-    RawHeaderFieldDate,
-    RawHeaderFieldFloat,
-    RawHeaderFieldTime,
-)
+from edfio._header_field import decode_date, decode_float, decode_time, encode_date
 
 
 def test_q1_create_edf_signal_with_non_printable_character_in_label_fails():
@@ -42,12 +38,12 @@ NON_STANDARD_DATES_OR_TIMES = (
 
 @pytest.mark.parametrize("field", NON_STANDARD_DATES_OR_TIMES)
 def test_q2_date_decode_different_formats(field: bytes):
-    assert RawHeaderFieldDate(8).decode(field) == datetime.date(2051, 8, 2)
+    assert decode_date(field) == datetime.date(2051, 8, 2)
 
 
 @pytest.mark.parametrize("field", NON_STANDARD_DATES_OR_TIMES)
 def test_q2_time_decode_different_formats(field: bytes):
-    assert RawHeaderFieldTime(8).decode(field) == datetime.time(2, 8, 51)
+    assert decode_time(field) == datetime.time(2, 8, 51)
 
 
 @pytest.mark.parametrize(
@@ -58,7 +54,7 @@ def test_q2_time_decode_different_formats(field: bytes):
     ],
 )
 def test_q3_clipping_date(field: bytes, date: datetime.date):
-    assert RawHeaderFieldDate(8).decode(field) == date
+    assert decode_date(field) == date
 
 
 @pytest.mark.parametrize(
@@ -69,9 +65,8 @@ def test_q3_clipping_date(field: bytes, date: datetime.date):
     ],
 )
 def test_q3_exception_on_date_outside_representable_range(date: datetime.date):
-    date_field = RawHeaderFieldDate(8)
     with pytest.raises(ValueError, match="only allows dates from 1985 to 2084"):
-        assert date_field.decode(date_field.encode(date)) == date
+        assert decode_date(encode_date(date)) == date
 
 
 @pytest.mark.parametrize(
@@ -85,12 +80,12 @@ def test_q3_exception_on_date_outside_representable_range(date: datetime.date):
     ],
 )
 def test_q7_float_decode_different_formats(field: bytes, value: float):
-    assert RawHeaderFieldFloat(8).decode(field) == value
+    assert decode_float(field) == value
 
 
 def test_q7_float_decode_fails_on_comma():
     with pytest.raises(ValueError, match="could not convert string to float"):
-        RawHeaderFieldFloat(8).decode(b"-123,456")
+        decode_float(b"-123,456")
 
 
 def test_q8_read_uncalibrated_signal(tmp_file: Path):
@@ -141,7 +136,7 @@ def test_q11_read_non_standard_ascii_characters_in_header(tmp_file: Path):
 
 def test_q11_num_data_records_not_specified(tmp_file: Path):
     edf = Edf(signals=[EdfSignal(np.arange(10), 1)])
-    edf._num_data_records = Edf.num_data_records.encode(-1)
+    edf._num_data_records = b"-1      "
     with pytest.warns(UserWarning, match="num_data_records=-1, determining correct"):
         edf.write(tmp_file)
     edf = read_edf(tmp_file)

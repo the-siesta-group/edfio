@@ -114,12 +114,12 @@ def test_edf_signal_init_all_parameters():
 )
 def test_edf_signal_field_cannot_be_set_publicly(field_name: str):
     signal = EdfSignal(np.arange(10), 1)
-    with pytest.raises(AttributeError, match="can't set attribute"):
+    with pytest.raises(AttributeError, match="can't set attribute|has no setter"):
         setattr(signal, field_name, None)
 
 
 EDFSIGNAL_SETTER_TEST_FIELDS = [
-    ("_label", 16, "EEG FPz-Cz"),
+    ("label", 16, "EEG FPz-Cz"),
     ("transducer_type", 80, "AgAgCl electrode"),
     ("physical_dimension", 8, "uV"),
     ("prefiltering", 80, "HP:0.1Hz LP:75Hz"),
@@ -180,7 +180,7 @@ def test_edf_signal_repr(signal: EdfSignal, expected: str):
 def test_edf_signal_from_raw_header_has_no_data_by_default():
     sig = EdfSignal._from_raw_header(
         20,
-        _label=b"".ljust(16),
+        label=b"".ljust(16),
         transducer_type=b"".ljust(80),
         physical_dimension=b"".ljust(8),
         physical_min=b"-500".ljust(8),

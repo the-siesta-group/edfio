@@ -8,9 +8,11 @@ import numpy as np
 import numpy.typing as npt
 
 from edfio._header_field import (
-    RawHeaderFieldFloat,
-    RawHeaderFieldInt,
-    RawHeaderFieldStr,
+    decode_float,
+    decode_str,
+    encode_float,
+    encode_int,
+    encode_str,
 )
 
 
@@ -83,30 +85,18 @@ class EdfSignal:
         The signal prefiltering, e.g., `"HP:0.1Hz LP:75Hz"`.
     """
 
-    _label = RawHeaderFieldStr(16, is_settable=True)
-    transducer_type = RawHeaderFieldStr(80, is_settable=True)
-    """Transducer type, e.g., `"AgAgCl electrode"`."""
-    physical_dimension = RawHeaderFieldStr(8, is_settable=True)
-    """Physical dimension, e.g., `"uV"` or `"degreeC"`."""
-    physical_min = RawHeaderFieldFloat(8)
-    """Physical minimum, e.g., `-500` or `34`."""
-    physical_max = RawHeaderFieldFloat(8)
-    """Physical maximum, e.g., `500` or `40`."""
-    digital_min = RawHeaderFieldInt(8)
-    """Digital minimum, e.g., `-2048`."""
-    digital_max = RawHeaderFieldInt(8)
-    """Digital maximum, e.g., `2047`."""
-    prefiltering = RawHeaderFieldStr(80, is_settable=True)
-    """Signal prefiltering, e.g., `"HP:0.1Hz LP:75Hz"`."""
-    samples_per_data_record = RawHeaderFieldInt(8)
-    """
-    Number of samples in each data record.
-
-    For newly instantiated :class:`EdfSignal` objects, this is only set once
-    :meth:`Edf.write` is called.
-    """
-    reserved = RawHeaderFieldStr(32)
-    """Reserved signal header field, always `""`"""
+    _header_fields = (
+        ("label", 16),
+        ("transducer_type", 80),
+        ("physical_dimension", 8),
+        ("physical_min", 8),
+        ("physical_max", 8),
+        ("digital_min", 8),
+        ("digital_max", 8),
+        ("prefiltering", 80),
+        ("samples_per_data_record", 8),
+        ("reserved", 32),
+    )
 
     def __init__(
         self,
@@ -125,7 +115,7 @@ class EdfSignal:
         self.transducer_type = transducer_type
         self.physical_dimension = physical_dimension
         self.prefiltering = prefiltering
-        self._reserved = EdfSignal.reserved.encode("")
+        self._set_reserved("")
         if not np.all(np.isfinite(data)):
             raise ValueError("Signal data must contain only finite values")
         self._set_physical_range(physical_range, data)
@@ -143,7 +133,7 @@ class EdfSignal:
         cls,
         sampling_frequency: float,
         *,
-        _label: bytes,
+        label: bytes,
         transducer_type: bytes,
         physical_dimension: bytes,
         physical_min: bytes,
@@ -156,16 +146,16 @@ class EdfSignal:
     ) -> EdfSignal:
         sig = object.__new__(cls)
         sig._sampling_frequency = sampling_frequency
-        sig._label = EdfSignal._label.decode(_label)  # type: ignore[attr-defined]
-        sig._transducer_type = transducer_type  # type: ignore[attr-defined]
-        sig._physical_dimension = physical_dimension  # type: ignore[attr-defined]
-        sig._physical_min = physical_min  # type: ignore[attr-defined]
-        sig._physical_max = physical_max  # type: ignore[attr-defined]
-        sig._digital_min = digital_min  # type: ignore[attr-defined]
-        sig._digital_max = digital_max  # type: ignore[attr-defined]
-        sig._prefiltering = prefiltering  # type: ignore[attr-defined]
-        sig._samples_per_data_record = samples_per_data_record  # type: ignore[attr-defined]
-        sig._reserved = reserved  # type: ignore[attr-defined]
+        sig._label = label
+        sig._transducer_type = transducer_type
+        sig._physical_dimension = physical_dimension
+        sig._physical_min = physical_min
+        sig._physical_max = physical_max
+        sig._digital_min = digital_min
+        sig._digital_max = digital_max
+        sig._prefiltering = prefiltering
+        sig._samples_per_data_record = samples_per_data_record
+        sig._reserved = reserved
         return sig
 
     @classmethod
@@ -212,16 +202,84 @@ class EdfSignal:
             digital_range=(0, 9),
         )
 
+    def _set_samples_per_data_record(self, samples_per_data_record: int) -> None:
+        self._samples_per_data_record = encode_int(samples_per_data_record, 8)
+
+    def _set_reserved(self, reserved: str) -> None:
+        self._reserved = encode_str(reserved, 32)
+
     @property
     def label(self) -> str:
         """Signal label, e.g., `"EEG Fpz-Cz"` or `"Body temp"`."""
-        return self._label
+        return decode_str(self._label)
 
     @label.setter
     def label(self, label: str) -> None:
         if label == "EDF Annotations":
             raise ValueError("Ordinary signal label must not be 'EDF Annotations'.")
-        self._label = label
+        self._label = encode_str(label, 16)
+
+    @property
+    def transducer_type(self) -> str:
+        """Transducer type, e.g., `"AgAgCl electrode"`."""
+        return decode_str(self._transducer_type)
+
+    @transducer_type.setter
+    def transducer_type(self, transducer_type: str) -> None:
+        self._transducer_type = encode_str(transducer_type, 80)
+
+    @property
+    def physical_dimension(self) -> str:
+        """Physical dimension, e.g., `"uV"` or `"degreeC`."""
+        return decode_str(self._physical_dimension)
+
+    @physical_dimension.setter
+    def physical_dimension(self, physical_dimension: str) -> None:
+        self._physical_dimension = encode_str(physical_dimension, 8)
+
+    @property
+    def physical_min(self) -> float:
+        """Physical minimum, e.g., `-500` or `34`."""
+        return decode_float(self._physical_min)
+
+    @property
+    def physical_max(self) -> float:
+        """Physical maximum, e.g., `500` or `40`."""
+        return decode_float(self._physical_max)
+
+    @property
+    def digital_min(self) -> int:
+        """Digital minimum, e.g., `-2048`."""
+        return int(decode_str(self._digital_min))
+
+    @property
+    def digital_max(self) -> int:
+        """Digital maximum, e.g., `2047`."""
+        return int(decode_str(self._digital_max))
+
+    @property
+    def prefiltering(self) -> str:
+        """Signal prefiltering, e.g., `"HP:0.1Hz LP:75Hz"`."""
+        return decode_str(self._prefiltering)
+
+    @prefiltering.setter
+    def prefiltering(self, prefiltering: str) -> None:
+        self._prefiltering = encode_str(prefiltering, 80)
+
+    @property
+    def samples_per_data_record(self) -> int:
+        """
+        Number of samples in each data record.
+
+        For newly instantiated :class:`EdfSignal` objects, this is only set once
+        :meth:`Edf.write` is called.
+        """
+        return int(decode_str(self._samples_per_data_record))
+
+    @property
+    def reserved(self) -> str:
+        """Reserved signal header field, always `""`."""
+        return decode_str(self._reserved)
 
     @property
     def physical_range(self) -> _FloatRange:
@@ -323,8 +381,8 @@ class EdfSignal:
             raise ValueError(
                 f"Digital minimum ({digital_range.min}) must differ from digital maximum ({digital_range.max})."
             )
-        self._digital_min = EdfSignal.digital_min.encode(digital_range.min)
-        self._digital_max = EdfSignal.digital_max.encode(digital_range.max)
+        self._digital_min = encode_int(digital_range.min, 8)
+        self._digital_max = encode_int(digital_range.max, 8)
 
     def _set_physical_range(
         self,
@@ -347,10 +405,10 @@ class EdfSignal:
                 raise ValueError(
                     f"Signal range [{data_min}, {data_max}] out of physical range: [{physical_range.min}, {physical_range.max}]"
                 )
-        self._physical_min = EdfSignal.physical_min.encode(
+        self._physical_min = encode_float(
             _round_float_to_8_characters(physical_range.min, math.floor)
         )
-        self._physical_max = EdfSignal.physical_max.encode(
+        self._physical_max = encode_float(
             _round_float_to_8_characters(physical_range.max, math.ceil)
         )
 

@@ -188,7 +188,7 @@ def test_write_edf_with_annotations(tmp_file: Path):
     assert edf.annotations == annotations
     assert edf.reserved == "EDF+C"
     assert edf.num_signals == 1
-    assert edf._num_signals == 2
+    assert edf._total_num_signals == 2
 
 
 def test_annotations_outside_recording_limits(tmp_file: Path):
@@ -397,7 +397,7 @@ def test_starttime_raises_helpful_error_for_invalid_timestamp_annotation():
             ),
         ]
     )
-    edf._reserved = Edf.reserved.encode("EDF+C")
+    edf._reserved = b"EDF+C".ljust(44)
     with pytest.raises(ValueError, match="Subsecond offset in first annotation must"):
         edf.starttime
 
