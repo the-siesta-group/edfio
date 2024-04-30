@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.4.1] - 2024-04-30
+
 ### Added
 - Make EDF+ header fields `patient` and `recording` more tolerant regarding non-compliant inputs: omitted subfields are returned as `X` instead of throwing an exception ([#18](https://github.com/the-siesta-group/edfio/pull/18)).
 - Allow reading from `tempfile.SpooledTemporaryFile[bytes]` ([#36](https://github.com/the-siesta-group/edfio/pull/36)).
