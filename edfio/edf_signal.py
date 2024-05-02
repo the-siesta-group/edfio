@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import math
 import warnings
-from typing import Callable, NamedTuple
+from typing import Any, Callable, NamedTuple
 
 import numpy as np
 import numpy.typing as npt
@@ -51,6 +51,21 @@ def _calculate_gain_and_offset(
     return gain, offset
 
 
+class _LazyLoader:
+    def __init__(
+        self,
+        datarecords: np.memmap[Any, np.dtype[np.int16]] | npt.NDArray[np.int16],
+        start_idx: int,
+        end_idx: int,
+    ):
+        self._datarecords = datarecords
+        self._start_idx = start_idx
+        self._end_idx = end_idx
+
+    def load_data(self) -> npt.NDArray[np.int16]:
+        return self._datarecords[:, self._start_idx : self._end_idx].flatten()
+
+
 class EdfSignal:
     """A single EDF signal.
 
@@ -97,6 +112,9 @@ class EdfSignal:
         ("samples_per_data_record", 8),
         ("reserved", 32),
     )
+
+    _digital: npt.NDArray[np.int16] | None = None
+    _lazy_loader: _LazyLoader | None = None
 
     def __init__(
         self,
@@ -297,6 +315,22 @@ class EdfSignal:
         return self._sampling_frequency
 
     @property
+    def digital_data(self) -> npt.NDArray[np.int16]:
+        """
+        Numpy array containing the digital (uncalibrated) signal values as 16-bit integers.
+
+        To simplify avoiding inconsistencies between signal data and header fields,
+        individual values in the returned array can not be modified. Use
+        :meth:`EdfSignal.update_data` to update raw signal values with calibrated data.
+        """
+        if self._digital is None:
+            if self._lazy_loader is None:
+                raise ValueError("Signal data not set")
+            self._digital = self._lazy_loader.load_data()
+            self._lazy_loader = None
+        return self._digital
+
+    @property
     def data(self) -> npt.NDArray[np.float64]:
         """
         Numpy array containing the physical signal values as floats.
@@ -313,14 +347,14 @@ class EdfSignal:
                 self.physical_max,
             )
         except ZeroDivisionError:
-            data = self._digital.astype(np.float64)
+            data = self.digital_data.astype(np.float64)
             warnings.warn(
                 f"Digital minimum equals digital maximum ({self.digital_min}) for {self.label}, returning uncalibrated signal."
             )
         except ValueError:
-            data = self._digital.astype(np.float64)
+            data = self.digital_data.astype(np.float64)
         else:
-            data = (self._digital + offset) * gain
+            data = (self.digital_data + offset) * gain
         data.setflags(write=False)
         return data
 
@@ -344,7 +378,7 @@ class EdfSignal:
             If not `None`, the `sampling_frequency` is updated to the new value. The new
             data must match the expected length for the new sampling frequency.
         """
-        expected_length = len(self._digital)
+        expected_length = len(self.digital_data)
         if (
             sampling_frequency is not None
             and sampling_frequency != self._sampling_frequency
@@ -352,7 +386,7 @@ class EdfSignal:
             expected_length = self._get_expected_new_length(sampling_frequency)
         if len(data) != expected_length:
             raise ValueError(
-                f"Signal lengths must match: got {len(data)}, expected {len(self._digital)}."
+                f"Signal lengths must match: got {len(data)}, expected {len(self.digital_data)}."
             )
         physical_range = self.physical_range if keep_physical_range else None
         self._set_physical_range(physical_range, data)
@@ -365,7 +399,7 @@ class EdfSignal:
             raise ValueError(
                 f"Sampling frequency must be positive, got {sampling_frequency}"
             )
-        current_length = len(self._digital)
+        current_length = len(self.digital_data)
         expected_length_f = (
             sampling_frequency / self._sampling_frequency * current_length
         )

@@ -8,7 +8,12 @@ import numpy as np
 import pytest
 
 from edfio import EdfSignal
-from edfio.edf_signal import _FloatRange, _IntRange, _round_float_to_8_characters
+from edfio.edf_signal import (
+    _FloatRange,
+    _IntRange,
+    _LazyLoader,
+    _round_float_to_8_characters,
+)
 
 
 # fmt: off
@@ -191,7 +196,7 @@ def test_edf_signal_from_raw_header_has_no_data_by_default():
         samples_per_data_record=b"1".ljust(8),
         reserved=b"".ljust(32),
     )
-    with pytest.raises(AttributeError, match="has no attribute '_digital'"):
+    with pytest.raises(ValueError, match="Signal data not set"):
         sig.data
 
 
@@ -363,3 +368,34 @@ def test_edf_signal_init_does_not_accept_edf_annotations_as_label():
 def test_edf_signal_label_cannot_be_set_to_edf_annotations():
     with pytest.raises(ValueError, match="must not be 'EDF Annotations'"):
         EdfSignal(np.arange(2), 1).label = "EDF Annotations"
+
+
+def test_lazy_load_signal_data():
+    sig = EdfSignal._from_raw_header(
+        1,
+        label=b"".ljust(16),
+        transducer_type=b"".ljust(80),
+        physical_dimension=b"".ljust(8),
+        physical_min=b"-500".ljust(8),
+        physical_max=b"500".ljust(8),
+        digital_min=b"-2048".ljust(8),
+        digital_max=b"2047".ljust(8),
+        prefiltering=b"".ljust(80),
+        samples_per_data_record=b"1".ljust(8),
+        reserved=b"".ljust(32),
+    )
+    sig._lazy_loader = _LazyLoader(
+        np.asarray([
+                [11, 12, 13, 14, 15],
+                [21, 22, 23, 24, 25],
+                [31, 32, 33, 34, 35],
+                [41, 42, 43, 44, 45],
+                [51, 52, 53, 54, 55],
+            ], dtype="int16"),
+        start_idx=2,
+        end_idx=4
+    )
+    np.testing.assert_array_equal(
+        sig.digital_data,
+        [ 13, 14, 23, 24, 33, 34, 43, 44, 53, 54 ]
+    )
