@@ -1078,9 +1078,6 @@ def read_edf(
     Edf
         The resulting :class:`Edf` object.
     """
-    do_lazy_load: bool
     if lazy_load_data == "auto":
-        do_lazy_load = isinstance(edf_file, (Path, str))
-    else:
-        do_lazy_load = lazy_load_data
-    return _read_edf(edf_file, lazy_load_data=do_lazy_load)
+        lazy_load_data = isinstance(edf_file, (Path, str))
+    return _read_edf(edf_file, lazy_load_data=lazy_load_data)
