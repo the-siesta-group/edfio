@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.4.2] - 2024-05-13
+
 ### Added
 - Lazy load raw signals from local EDF files. Lazy loading is supported and enabled by default when passing a `str` or `pathlib.Path` object to the `read_edf` function. The behavior can be controlled using the `lazy_load_data` parameters of the `read_edf` function ([#48](https://github.com/the-siesta-group/edfio/pull/48)).
 - Public getter for digital signal values called `digital` ([#48](https://github.com/the-siesta-group/edfio/pull/48)).
