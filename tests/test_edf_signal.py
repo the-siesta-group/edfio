@@ -8,7 +8,11 @@ import numpy as np
 import pytest
 
 from edfio import EdfSignal
-from edfio.edf_signal import _FloatRange, _IntRange, _round_float_to_8_characters
+from edfio.edf_signal import (
+    _FloatRange,
+    _IntRange,
+    _round_float_to_8_characters,
+)
 
 
 # fmt: off
@@ -191,7 +195,7 @@ def test_edf_signal_from_raw_header_has_no_data_by_default():
         samples_per_data_record=b"1".ljust(8),
         reserved=b"".ljust(32),
     )
-    with pytest.raises(AttributeError, match="has no attribute '_digital'"):
+    with pytest.raises(ValueError, match="Signal data not set"):
         sig.data
 
 

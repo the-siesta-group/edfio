@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import Any, Literal
 
 import numpy as np
+import numpy.typing as npt
 
 from edfio._header_field import (
     decode_date,
@@ -204,7 +205,11 @@ class Edf:
     def local_recording_identification(self, value: str) -> None:
         self._local_recording_identification = encode_str(value, 80)
 
-    def _load_data(self, file: Path | io.BufferedReader | io.BytesIO) -> None:
+    def _load_data(
+        self, file: Path | io.BufferedReader | io.BytesIO, *, lazy_load_data: bool
+    ) -> None:
+        if lazy_load_data and not isinstance(file, Path):
+            raise ValueError("Lazy loading is only supported for local file paths")
         lens = [signal.samples_per_data_record for signal in self._signals]
         datarecord_len = sum(lens)
         truncated = False
@@ -242,7 +247,14 @@ class Edf:
         starts = ends - lens
 
         for signal, start, end in zip(self._signals, starts, ends):
-            signal._digital = datarecords[:, start:end].flatten()
+            if lazy_load_data:
+
+                def lazy_load(s: int = start, e: int = end) -> npt.NDArray[np.int16]:
+                    return datarecords[:, s:e].flatten()
+
+                signal._lazy_loader = lazy_load
+            else:
+                signal._digital = datarecords[:, start:end].flatten()
 
     def _read_header(self, buffer: io.BufferedReader | io.BytesIO) -> None:
         for header_name, length in Edf._header_fields:
@@ -279,7 +291,7 @@ class Edf:
             num_data_records = 1
         else:
             signal_durations = [
-                round(len(s._digital) / s.sampling_frequency, 12) for s in signals
+                round(len(s.digital) / s.sampling_frequency, 12) for s in signals
             ]
             if any(v != signal_durations[0] for v in signal_durations[1:]):
                 raise ValueError(
@@ -289,7 +301,7 @@ class Edf:
                 signal_durations[0],
                 self.data_record_duration,
             )
-            signal_lengths = [len(s._digital) for s in signals]
+            signal_lengths = [len(s.digital) for s in signals]
             if any(l % num_data_records for l in signal_lengths):
                 raise ValueError(
                     f"Not all signal lengths can be split into {num_data_records} data records: {signal_lengths}"
@@ -336,15 +348,13 @@ class Edf:
         if self.num_data_records == -1:
             warnings.warn("num_data_records=-1, determining correct value from data")
             num_data_records = _calculate_num_data_records(
-                len(self._signals[0]._digital) * self._signals[0].sampling_frequency,
+                len(self._signals[0].digital) * self._signals[0].sampling_frequency,
                 self.data_record_duration,
             )
         else:
             num_data_records = self.num_data_records
         for signal in self._signals:
-            signal._set_samples_per_data_record(
-                len(signal._digital) // num_data_records
-            )
+            signal._set_samples_per_data_record(len(signal.digital) // num_data_records)
         header_records = []
         for header_name, _ in Edf._header_fields:
             header_records.append(getattr(self, "_" + header_name))
@@ -358,7 +368,7 @@ class Edf:
         starts = ends - lens
         data_record = np.empty((num_data_records, sum(lens)), dtype=np.int16)
         for signal, start, end in zip(self._signals, starts, ends):
-            data_record[:, start:end] = signal._digital.reshape((-1, end - start))
+            data_record[:, start:end] = signal.digital.reshape((-1, end - start))
 
         if isinstance(target, str):
             target = Path(target)
@@ -479,7 +489,7 @@ class Edf:
     @property
     def _subsecond_offset(self) -> float:
         try:
-            timekeeping_raw = self._timekeeping_signal._digital.tobytes()
+            timekeeping_raw = self._timekeeping_signal.digital.tobytes()
             first_data_record = timekeeping_raw[: timekeeping_raw.find(b"\x00") + 1]
             return _EdfAnnotationsDataRecord.from_bytes(first_data_record).tals[0].onset
         except StopIteration:
@@ -509,7 +519,7 @@ class Edf:
         if starttime.microsecond != self.starttime.microsecond:
             timekeeping_signal = self._timekeeping_signal
             data_records = []
-            for data_record in timekeeping_signal._digital.reshape(
+            for data_record in timekeeping_signal.digital.reshape(
                 (-1, timekeeping_signal.samples_per_data_record)
             ):
                 annot_dr = _EdfAnnotationsDataRecord.from_bytes(data_record.tobytes())
@@ -636,7 +646,7 @@ class Edf:
             if signal not in self._annotation_signals:
                 continue
             annotations = []
-            for data_record in signal._digital.reshape(
+            for data_record in signal.digital.reshape(
                 (-1, signal.samples_per_data_record)
             ):
                 annot_dr = _EdfAnnotationsDataRecord.from_bytes(data_record.tobytes())
@@ -659,7 +669,7 @@ class Edf:
     def _pad_or_truncate_data(self, new_duration: float) -> None:
         for signal in self.signals:
             n_samples = round(new_duration * signal.sampling_frequency)
-            diff = n_samples - len(signal._digital)
+            diff = n_samples - len(signal.digital)
             if diff > 0:
                 physical_pad_value = 0.0
                 if signal.physical_min > 0 or signal.physical_max < 0:
@@ -771,7 +781,7 @@ class Edf:
         """
         annotations: list[EdfAnnotation] = []
         for i, signal in enumerate(self._annotation_signals):
-            for data_record in signal._digital.reshape(
+            for data_record in signal.digital.reshape(
                 (-1, signal.samples_per_data_record)
             ):
                 annot_dr = _EdfAnnotationsDataRecord.from_bytes(data_record.tobytes())
@@ -802,7 +812,7 @@ class Edf:
             All annotations whose text exactly matches this parameter are removed.
         """
         for signal in self._annotation_signals:
-            for data_record in signal._digital.reshape(
+            for data_record in signal.digital.reshape(
                 (-1, signal.samples_per_data_record)
             ):
                 annotations = _EdfAnnotationsDataRecord.from_bytes(
@@ -871,7 +881,7 @@ class Edf:
             else:
                 start_index = start * signal.sampling_frequency
                 stop_index = stop * signal.sampling_frequency
-                signal._digital = signal._digital[int(start_index) : int(stop_index)]
+                signal._digital = signal.digital[int(start_index) : int(stop_index)]
                 signals.append(signal)
         self._set_signals(signals)
         self._shift_startdatetime(int(start))
@@ -968,9 +978,7 @@ class Edf:
     ) -> EdfSignal:
         is_timekeeping_signal = signal == self._timekeeping_signal
         annotations: list[EdfAnnotation] = []
-        for data_record in signal._digital.reshape(
-            (-1, signal.samples_per_data_record)
-        ):
+        for data_record in signal.digital.reshape((-1, signal.samples_per_data_record)):
             annot_dr = _EdfAnnotationsDataRecord.from_bytes(data_record.tobytes())
             if is_timekeeping_signal:
                 annotations.extend(annot_dr.annotations[1:])
@@ -1013,31 +1021,31 @@ def _calculate_data_record_duration(signals: Sequence[EdfSignal]) -> float:
 
 
 @singledispatch
-def _read_edf(edf_file: Any) -> Edf:
+def _read_edf(edf_file: Any, *, lazy_load_data: bool) -> Edf:
     edf = object.__new__(Edf)
     edf._read_header(edf_file)
-    edf._load_data(edf_file)
+    edf._load_data(edf_file, lazy_load_data=lazy_load_data)
     return edf
 
 
 @_read_edf.register
-def _(edf_file: Path) -> Edf:
+def _(edf_file: Path, *, lazy_load_data: bool) -> Edf:
     edf = object.__new__(Edf)
     edf_file = edf_file.expanduser()
     with edf_file.open("rb") as file:
         edf._read_header(file)
-    edf._load_data(edf_file)
+    edf._load_data(edf_file, lazy_load_data=lazy_load_data)
     return edf
 
 
 @_read_edf.register
-def _(edf_file: str) -> Edf:
-    return _read_edf(Path(edf_file))
+def _(edf_file: str, *, lazy_load_data: bool) -> Edf:
+    return _read_edf(Path(edf_file), lazy_load_data=lazy_load_data)
 
 
 @_read_edf.register
-def _(edf_file: bytes) -> Edf:
-    return _read_edf(io.BytesIO(edf_file))
+def _(edf_file: bytes, *, lazy_load_data: bool) -> Edf:
+    return _read_edf(io.BytesIO(edf_file), lazy_load_data=lazy_load_data)
 
 
 # Pyright loses information about parameters for singledispatch functions. Hiding it
@@ -1049,6 +1057,7 @@ def read_edf(
     | io.BytesIO
     | bytes
     | tempfile.SpooledTemporaryFile[bytes],
+    lazy_load_data: bool | Literal["auto"] = "auto",
 ) -> Edf:
     """
     Read an EDF file into an :class:`Edf` object.
@@ -1059,10 +1068,16 @@ def read_edf(
     ----------
     edf_file : Path | str | io.BufferedReader | io.BytesIO
         The file location (path object or string) or file-like object to read from.
+    lazy_load_data : bool | {"auto"}, default: "auto"
+        If `True`, the raw signal data is not loaded into memory until it is accessed. If `False`,
+        the data is loaded immediately. If `"auto"`, the data is loaded lazily if
+        the specified edf_file represents a local path and eagerly otherwise.
 
     Returns
     -------
     Edf
         The resulting :class:`Edf` object.
     """
-    return _read_edf(edf_file)
+    if lazy_load_data == "auto":
+        lazy_load_data = isinstance(edf_file, (Path, str))
+    return _read_edf(edf_file, lazy_load_data=lazy_load_data)
