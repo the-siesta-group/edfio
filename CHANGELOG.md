@@ -1,7 +1,7 @@
 # Changelog
 
 ## [Unreleased]
-When reading signal data that throws `ZeroDivisionError`, which condition caused the error is now tested for (either `digital_min == digital_max` or `physical_max == physical_min`) ([#51](https://github.com/the-siesta-group/edfio/pull/51)).
+- When reading signal data that throws `ZeroDivisionError`, which condition caused the error is now tested for (either `digital_min == digital_max` or `physical_max == physical_min`) ([#51](https://github.com/the-siesta-group/edfio/pull/51)).
 
 ## [0.4.2] - 2024-05-13
 
