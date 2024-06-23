@@ -331,9 +331,14 @@ class EdfSignal:
             )
         except ZeroDivisionError:
             data = self.digital.astype(np.float64)
-            warnings.warn(
-                f"Digital minimum equals digital maximum ({self.digital_min}) for {self.label}, returning uncalibrated signal."
-            )
+            if self.digital_max == self.digital_min:
+                warnings.warn(
+                    f"Digital minimum equals digital maximum ({self.digital_min}) for {self.label}, returning uncalibrated signal."
+                )
+            else:
+                warnings.warn(
+                    f"Physical minimum equals physical maximum ({self.physical_min}) for {self.label}, returning uncalibrated signal."
+                )
         except ValueError:
             data = self.digital.astype(np.float64)
         else:

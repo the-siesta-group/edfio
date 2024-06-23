@@ -108,6 +108,14 @@ def test_q8_edf_signal_where_digital_min_equals_digital_max_data_emits_warning_a
         np.testing.assert_equal(signal.data, np.array([-32768, 32767]))
 
 
+def test_q8_edf_signal_where_physical_min_equals_physical_max_data_emits_warning_and_returns_uncalibrated():
+    signal = EdfSignal(np.array([-10, 10]), 1, physical_range=(-10, 10))
+    signal._physical_min = b"0       "
+    signal._physical_max = b"0       "
+    with pytest.warns(UserWarning, match="Physical minimum equals .* uncalibrated .*"):
+        np.testing.assert_equal(signal.data, np.array([-32768, 32767]))
+
+
 @pytest.mark.parametrize(
     ("sampling_frequency", "num_samples", "expected_data_record_duration"),
     [
