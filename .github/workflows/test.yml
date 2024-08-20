@@ -20,7 +20,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ["3.9", "3.10", "3.11", "3.12"]
+        python-version: ["3.9", "3.10", "3.11", "3.12", "3.13"]
         numpy: ["--pre numpy"]
         include:
           - python-version: "3.9"
@@ -31,6 +31,8 @@ jobs:
             numpy: numpy==1.23.2
           - python-version: "3.12"
             numpy: numpy==1.26.0
+          - python-version: "3.13"
+            numpy: numpy==2.1.0
     steps:
       - uses: actions/checkout@v4
         with:
@@ -38,6 +40,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
+          allow-prereleases: true
       - uses: actions/cache@v4
         with:
           path: ~/.cache/pip
