@@ -824,6 +824,26 @@ class Edf:
                     dtype=np.int16,
                 )
 
+    def set_annotations(self, annotations: Iterable[EdfAnnotation]) -> None:
+        """
+        Overwrite all annotations with new ones.
+
+        This removes all existing annotation signals and adds a new one as the last
+        signal in the file.
+
+        Parameters
+        ----------
+        annotations : Iterable[EdfAnnotation]
+            The annotations to set.
+        """
+        new_annotation_signal = _create_annotations_signal(
+            annotations,
+            num_data_records=self.num_data_records,
+            data_record_duration=self.data_record_duration,
+            subsecond_offset=self.starttime.microsecond / 1_000_000,
+        )
+        self._set_signals((*self.signals, new_annotation_signal))
+
     def to_bytes(self) -> bytes:
         """
         Convert an Edf to a `bytes` object.
