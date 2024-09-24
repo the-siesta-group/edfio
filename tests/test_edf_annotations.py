@@ -452,3 +452,16 @@ def test_set_annotations_removes_all_existing_annotation_signals(tmp_file: Path)
     assert edf.annotations == new_annotations
     assert edf.labels == ("EEG 1", "EEG 2")
     assert [s.label for s in edf._signals] == ["EEG 1", "EEG 2", "EDF Annotations"]
+
+
+def test_add_annotations(tmp_file: Path):
+    old_annotations = (
+        EdfAnnotation(3.5, 3, text="old 1"),
+        EdfAnnotation(5, 1, "old 2"),
+    )
+    edf = Edf([EdfSignal(np.arange(10), 1)], annotations=old_annotations)
+    new_annotations = (EdfAnnotation(1, 1, "new 1"), EdfAnnotation(2, None, "new 2"))
+    edf.add_annotations(new_annotations)
+    edf.write(tmp_file)
+    edf = read_edf(tmp_file)
+    assert edf.annotations == tuple(sorted(old_annotations + new_annotations))

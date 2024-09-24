@@ -844,6 +844,20 @@ class Edf:
         )
         self._set_signals((*self.signals, new_annotation_signal))
 
+    def add_annotations(self, annotations: Iterable[EdfAnnotation]) -> None:
+        """
+        Add annotations to the Edf.
+
+        This removes all existing annotation signals and adds a new one containing the
+        old and new annotations as the last signal in the file.
+
+        Parameters
+        ----------
+        annotations : Iterable[EdfAnnotation]
+            The annotations to add.
+        """
+        self.set_annotations(self.annotations + tuple(annotations))
+
     def to_bytes(self) -> bytes:
         """
         Convert an Edf to a `bytes` object.
