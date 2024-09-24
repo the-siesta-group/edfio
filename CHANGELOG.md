@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+### Added
+- Allow adding new EDF+ annotations and overwriting all existing ones with `Edf.add_annotations` and `Edf._set_annotations` ([#54](https://github.com/the-siesta-group/edfio/pull/54)).
+
 ## [0.4.3] - 2024-06-23
 
 ### Fixed
