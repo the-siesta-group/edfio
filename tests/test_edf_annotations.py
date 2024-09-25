@@ -406,3 +406,62 @@ def test_edf_anonymized_does_not_remove_annotations():
     edf = read_edf(MNE_TEST_FILE)
     edf.anonymize()
     assert edf.annotations == MNE_TEST_ANNOTATIONS
+
+
+def test_set_annotations(tmp_file: Path):
+    old_annotations = (
+        EdfAnnotation(3.5, 3, text="old 1"),
+        EdfAnnotation(5, 1, "old 2"),
+    )
+    edf = Edf([EdfSignal(np.arange(10), 1)], annotations=old_annotations)
+    new_annotations = (EdfAnnotation(1, 1, "new 1"), EdfAnnotation(2, None, "new 2"))
+    edf.set_annotations(new_annotations)
+    edf.write(tmp_file)
+    edf = read_edf(tmp_file)
+    assert edf.annotations == new_annotations
+
+
+def test_set_annotations_removes_all_existing_annotation_signals(tmp_file: Path):
+    edf = Edf(
+        signals=[
+            _create_annotations_signal(
+                [
+                    EdfAnnotation(0, None, "sig 1 ann 1"),
+                    EdfAnnotation(0.5, None, "sig 1 ann 2"),
+                ],
+                num_data_records=2,
+                data_record_duration=1,
+            ),
+            EdfSignal(np.arange(2), sampling_frequency=1, label="EEG 1"),
+            _create_annotations_signal(
+                [
+                    EdfAnnotation(0.25, None, "sig 2 ann 1"),
+                    EdfAnnotation(0.75, None, "sig 2 ann 2"),
+                ],
+                num_data_records=2,
+                data_record_duration=1,
+                with_timestamps=False,
+            ),
+            EdfSignal(np.arange(2), sampling_frequency=1, label="EEG 2"),
+        ],
+    )
+    new_annotations = (EdfAnnotation(1, 1, "new 1"), EdfAnnotation(2, None, "new 2"))
+    edf.set_annotations(new_annotations)
+    edf.write(tmp_file)
+    edf = read_edf(tmp_file)
+    assert edf.annotations == new_annotations
+    assert edf.labels == ("EEG 1", "EEG 2")
+    assert [s.label for s in edf._signals] == ["EEG 1", "EEG 2", "EDF Annotations"]
+
+
+def test_add_annotations(tmp_file: Path):
+    old_annotations = (
+        EdfAnnotation(3.5, 3, text="old 1"),
+        EdfAnnotation(5, 1, "old 2"),
+    )
+    edf = Edf([EdfSignal(np.arange(10), 1)], annotations=old_annotations)
+    new_annotations = (EdfAnnotation(1, 1, "new 1"), EdfAnnotation(2, None, "new 2"))
+    edf.add_annotations(new_annotations)
+    edf.write(tmp_file)
+    edf = read_edf(tmp_file)
+    assert edf.annotations == tuple(sorted(old_annotations + new_annotations))
