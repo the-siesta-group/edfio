@@ -1,36 +1,51 @@
-[tool.poetry]
+[build-system]
+requires = ["hatchling", "hatch-vcs"]
+build-backend = "hatchling.build"
+
+[project]
 name = "edfio"
-version = "0.0.0"
 description = "Read and write EDF/EDF+ files."
-license = "Apache-2.0"
-authors = ["The Siesta Group <opensource@thesiestagroup.com>"]
+license = { text = "Apache-2.0" }
+authors = [
+    { name = "The Siesta Group", email = "opensource@thesiestagroup.com" }
+]
 readme = "README.md"
+requires-python = ">=3.9"
+dependencies = [
+    "numpy >= 1.22.0"
+]
+dynamic = ["version"]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4.3",
+    "pytest-cov>=4.1.0",
+    "pre-commit>=3.5.0",
+    "mypy>=1.6.1",
+    "ruff>=0.3.4",
+    "sphinx>=7.2.6",
+    "myst-parser>=2.0.0",
+    "pydata-sphinx-theme>=0.14.3",
+    "numpydoc>=1.6.0"
+]
+
+[project.urls]
 repository = "https://github.com/the-siesta-group/edfio"
 documentation = "https://edfio.readthedocs.io"
 
-[tool.poetry.dependencies]
-python = "^3.9"
-numpy = ">=1.22.0"
+[tool.hatch.version]
+source = "vcs"
+raw-options = { version_scheme = "release-branch-semver" }
 
-[tool.poetry.group.dev.dependencies]
-pytest = "7.4.3"
-pytest-cov = "4.1.0"
-pre-commit = "3.5.0"
-mypy = "1.6.1"
-ruff = "0.3.4"
-sphinx = "7.2.6"
-myst-parser = "2.0.0"
-pydata-sphinx-theme = "0.14.3"
-numpydoc = "1.6.0"
-
-[tool.poetry-dynamic-versioning]
-vcs = "git"
-style = "semver"
-enable = true
-
-[build-system]
-requires = ["poetry-core>=1.0.0", "poetry-dynamic-versioning>=1.0.0,<2.0.0"]
-build-backend = "poetry_dynamic_versioning.backend"
+[tool.mypy]
+python_version = "3.9"
+ignore_missing_imports = true
+disallow_untyped_defs = true
+warn_unreachable = true
+strict_equality = true
+pretty = true
+warn_unused_ignores = true
+packages = ["edfio"]
 
 [tool.ruff]
 target-version = "py39"
@@ -70,13 +85,3 @@ ban-relative-imports = "all"
 
 [tool.ruff.lint.pydocstyle]
 convention = "numpy"
-
-[tool.mypy]
-python_version = "3.9"
-ignore_missing_imports = true
-disallow_untyped_defs = true
-warn_unreachable = true
-strict_equality = true
-pretty = true
-warn_unused_ignores = true
-packages = ["edfio"]
