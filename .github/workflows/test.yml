@@ -37,19 +37,17 @@ jobs:
       - uses: actions/checkout@v4
         with:
           lfs: true
-      - uses: actions/setup-python@v5
-        with:
-          python-version: ${{ matrix.python-version }}
-          allow-prereleases: true
       - uses: actions/cache@v4
         with:
           path: ~/.cache/pre-commit
           key: ${{ runner.os }}-pre-commit-${{ hashFiles('.pre-commit-config.yaml') }}
-      - name: Install uv
+      - name: Setup uv
         uses: astral-sh/setup-uv@v3
+      - name: Install Python ${{ matrix.python-version }}
+        run: uv python install ${{ matrix.python-version }}
       - name: Pre-commit
         run: |
-          uv run --extra dev --with ${{matrix.numpy}} pre-commit run --all-files
+          uv run --extra dev --with ${{ matrix.numpy }} pre-commit run --all-files
       - name: Pytest
         run: |
-          uv run --extra dev --with ${{matrix.numpy}} pytest -Werror --cov --cov-report term-missing --cov-fail-under=100
+          uv run --extra dev --with ${{ matrix.numpy }} pytest -Werror --cov --cov-report term-missing --cov-fail-under=100
