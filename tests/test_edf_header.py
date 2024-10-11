@@ -29,19 +29,19 @@ def test_decode_edfplus_date_invalid_month_name():
         _decode_edfplus_date("02-MAI-1951")
 
 
-@pytest.fixture
+@pytest.fixture()
 def patient():
     return Patient._from_str("MCH-0234567 F 02-MAY-1951 Haagse_Harry")
 
 
-@pytest.fixture
+@pytest.fixture()
 def recording():
     return Recording._from_str(
         "Startdate 02-MAR-2002 EMG561 BK/JOP Sony. MNC R Median Nerve."
     )
 
 
-@pytest.fixture
+@pytest.fixture()
 def edf(patient, recording):
     return Edf([EdfSignal(np.arange(10), 1)], patient=patient, recording=recording)
 

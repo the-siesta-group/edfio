@@ -62,7 +62,7 @@ def sine(duration, f, fs):
     return np.sin(2 * np.pi * f * t)
 
 
-@pytest.fixture
+@pytest.fixture()
 def dummy_edf_signal() -> EdfSignal:
     data = sine(5, 2, 128)
     return EdfSignal(data, 128)
