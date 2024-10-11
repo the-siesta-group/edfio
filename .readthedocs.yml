@@ -9,9 +9,8 @@ build:
     python: "3.9"
   jobs:
     pre_build:
-      - pip install poetry==1.7.0
-      - poetry config virtualenvs.create false
-      - poetry install
+      - pip install uv
+      - uv install
 
 sphinx:
   configuration: docs/source/conf.py
