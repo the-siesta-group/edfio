@@ -10,7 +10,6 @@ build:
   jobs:
     pre_build:
       - pip install uv
-      - uv install
 
 sphinx:
   configuration: docs/source/conf.py
