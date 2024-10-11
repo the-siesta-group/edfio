@@ -43,23 +43,13 @@ jobs:
           allow-prereleases: true
       - uses: actions/cache@v4
         with:
-          path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-${{ hashFiles('pyproject.toml') }}
-          restore-keys: |
-            ${{ runner.os }}-pip-
-      - uses: actions/cache@v4
-        with:
           path: ~/.cache/pre-commit
           key: ${{ runner.os }}-pre-commit-${{ hashFiles('.pre-commit-config.yaml') }}
-      - name: Setup Poetry
-        run: |
-          pip install -U pip
-          pip install poetry==1.7.0
-          poetry install --only dev
-          poetry run pip install ${{matrix.numpy}}
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
       - name: Pre-commit
         run: |
-          poetry run pre-commit run --all-files
+          uv run --with ${{matrix.numpy}} pre-commit run --all-files
       - name: Pytest
         run: |
-          poetry run pytest -Werror --cov --cov-report term-missing --cov-fail-under=100
+          uv run --with ${{matrix.numpy}} pytest -Werror --cov --cov-report term-missing --cov-fail-under=100
