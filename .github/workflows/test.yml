@@ -49,7 +49,7 @@ jobs:
         uses: astral-sh/setup-uv@v3
       - name: Pre-commit
         run: |
-          uv run --with ${{matrix.numpy}} pre-commit run --all-files
+          uv run --extra dev --with ${{matrix.numpy}} pre-commit run --all-files
       - name: Pytest
         run: |
-          uv run --with ${{matrix.numpy}} pytest -Werror --cov --cov-report term-missing --cov-fail-under=100
+          uv run --extra dev --with ${{matrix.numpy}} pytest -Werror --cov --cov-report term-missing --cov-fail-under=100
