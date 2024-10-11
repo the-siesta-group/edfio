@@ -10,6 +10,8 @@ build:
   jobs:
     pre_build:
       - pip install uv
+      - uv sync
+      - source .venv/bin/activate
 
 sphinx:
   configuration: docs/source/conf.py
