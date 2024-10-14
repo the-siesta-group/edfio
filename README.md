@@ -6,7 +6,6 @@
 [![License](https://img.shields.io/pypi/l/edfio)](https://github.com/the-siesta-group/edfio/blob/main/LICENSE)
 [![Docs](https://readthedocs.org/projects/edfio/badge)](https://edfio.readthedocs.io/en/stable/index.html)
 
-[![Poetry](https://img.shields.io/endpoint?url=https://python-poetry.org/badge/v0.json)](https://python-poetry.org/)
 [![Checked with mypy](https://www.mypy-lang.org/static/mypy_badge.svg)](https://mypy-lang.org/)
 [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/charliermarsh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 
