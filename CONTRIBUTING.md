@@ -27,19 +27,13 @@ Before you start working on your contribution, please make sure to follow the gu
 
 
 ## Development environment
-We use Poetry for managing project dependencies.
-If you haven't already, you can install Poetry by following the instructions in the [official documentation](https://python-poetry.org/docs/#installing-with-the-official-installer).
-Make sure to use Python 3.9:
+We suggest to use [`uv`](https://docs.astral.sh/uv/getting-started/installation/) for managing project dependencies, but any other standard-compliant tool will work too.
 
-    poetry env use 3.9
+Create a virtual environment with Python 3.9 and install all dependencies:
 
-Install all dependencies with
+    uv sync --python=3.9 --all-extras
 
-    poetry install
-
-And activate the virtual environment with
-
-    poetry shell
+**When using `uv`, prepend the commands below with `uv run` to make sure they are executed in the virtual environment!**
 
 
 ## Tests
@@ -85,4 +79,4 @@ To release a new version, follow the steps below:
 - [Create a new release](https://github.com/the-siesta-group/edfio/releases/new) on GitHub.
 - Create a new tag where the target version is prefixed with a `v`, e.g., `v0.2.0`.
 - Use the tag as the release title.
-- [poetry-dynamic-versioning](https://github.com/mtkennerly/poetry-dynamic-versioning) and the [release action](https://github.com/the-siesta-group/edfio/blob/main/.github/workflows/release.yml) take care of the rest.
+- The [release action](https://github.com/the-siesta-group/edfio/blob/main/.github/workflows/release.yml) takes care of the rest.
