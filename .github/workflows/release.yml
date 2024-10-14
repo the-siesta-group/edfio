@@ -11,17 +11,15 @@ jobs:
   publish:
     needs: test
     runs-on: ubuntu-latest
+    permissions:
+      id-token: write
     steps:
       - uses: actions/checkout@v4
         with:
           lfs: true
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.9"
-      - name: Publish
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v3
+      - name: Publish to PyPI
         run: |
-          pip install poetry==1.7.0
-          pip install poetry-dynamic-versioning[plugin]
-          poetry dynamic-versioning
-          poetry build
-          poetry publish -u __token__ -p ${{ secrets.PYPI_API_TOKEN }}
+          uv build
+          uv publish
