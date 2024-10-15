@@ -21,7 +21,7 @@ jobs:
     strategy:
       matrix:
         python-version: ["3.9", "3.10", "3.11", "3.12", "3.13"]
-        numpy: ["--pre numpy"]
+        numpy: ["numpy"]
         include:
           - python-version: "3.9"
             numpy: numpy==1.22.0
@@ -37,29 +37,17 @@ jobs:
       - uses: actions/checkout@v4
         with:
           lfs: true
-      - uses: actions/setup-python@v5
-        with:
-          python-version: ${{ matrix.python-version }}
-          allow-prereleases: true
-      - uses: actions/cache@v4
-        with:
-          path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-${{ hashFiles('pyproject.toml') }}
-          restore-keys: |
-            ${{ runner.os }}-pip-
       - uses: actions/cache@v4
         with:
           path: ~/.cache/pre-commit
           key: ${{ runner.os }}-pre-commit-${{ hashFiles('.pre-commit-config.yaml') }}
-      - name: Setup Poetry
-        run: |
-          pip install -U pip
-          pip install poetry==1.7.0
-          poetry install --only dev
-          poetry run pip install ${{matrix.numpy}}
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v3
+      - name: Install Python ${{ matrix.python-version }}
+        run: uv python install ${{ matrix.python-version }}
       - name: Pre-commit
         run: |
-          poetry run pre-commit run --all-files
+          uv run --extra dev --with ${{ matrix.numpy }} pre-commit run --all-files
       - name: Pytest
         run: |
-          poetry run pytest -Werror --cov --cov-report term-missing --cov-fail-under=100
+          uv run --extra dev --with ${{ matrix.numpy }} pytest -Werror --cov --cov-report term-missing --cov-fail-under=100
