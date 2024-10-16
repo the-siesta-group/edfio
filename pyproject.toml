@@ -25,6 +25,9 @@ classifiers = [
 ]
 dynamic = ["version"]
 
+[tool.hatch.build.targets.sdist]
+only-include = ["edfio"]
+
 [project.optional-dependencies]
 dev = [
     "pytest==7.4.3",
