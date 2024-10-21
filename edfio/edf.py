@@ -768,16 +768,44 @@ class Edf:
         """Recording duration in seconds."""
         return self.num_data_records * self.data_record_duration
 
-    @property
-    def annotations(self) -> tuple[EdfAnnotation, ...]:
+    def get_annotations(
+        self, start_second: float | None = None, duration: float | None = None
+    ) -> tuple[EdfAnnotation, ...]:
         """
-        All annotations contained in the Edf, sorted chronologically.
+        All annotations defined (starting) in a specified time region of the Edf, sorted chronologically.
 
-        Does not include timekeeping annotations.
+        Does not include timekeeping annotations. Will not include annotations that start within the specified time region but are
+        defined in data records outside of that window.
+
+        Parameters
+        ----------
+        start_second : float, optional
+            The start of the time region in seconds from recording start. If not provided, the start of the recording is used.
+        duration : float, optional
+            The duration of the time region in seconds. If not provided, the duration is set until the end of the recording.
         """
         annotations: list[EdfAnnotation] = []
+        start_second_defined = start_second is not None
+        duration_defined = duration is not None
+        start_second = start_second or 0
+        duration = duration or self.duration - start_second
         for i, signal in enumerate(self._annotation_signals):
-            for data_record in signal.digital.reshape(
+            if self.duration == 0 or signal.sampling_frequency == 0:
+                digital_slice = signal.digital
+            else:
+                # Make sure to read full data records
+                end_second = start_second + duration
+                start_record = start_second // self.data_record_duration
+                adjusted_start = start_record * self.data_record_duration
+                last_record = ceil(
+                    end_second / self.data_record_duration - 1e-12
+                )  # avoid floating point errors
+                adjusted_end = last_record * self.data_record_duration
+                adjusted_duration = adjusted_end - adjusted_start
+                digital_slice = signal.get_digital_slice(
+                    adjusted_start, adjusted_duration
+                )
+            for data_record in digital_slice.reshape(
                 (-1, signal.samples_per_data_record)
             ):
                 annot_dr = _EdfAnnotationsDataRecord.from_bytes(data_record.tobytes())
@@ -796,7 +824,24 @@ class Edf:
             )
             for ann in annotations
         ]
-        return tuple(sorted(annotations))
+        annotations = sorted(annotations)
+        if start_second_defined:
+            while annotations and annotations[0].onset < start_second:
+                annotations.pop(0)
+        if duration_defined:
+            end_second = start_second + duration
+            while annotations and annotations[-1].onset >= end_second:
+                annotations.pop()
+        return tuple(annotations)
+
+    @property
+    def annotations(self) -> tuple[EdfAnnotation, ...]:
+        """
+        All annotations contained in the Edf, sorted chronologically.
+
+        Does not include timekeeping annotations.
+        """
+        return self.get_annotations()
 
     def drop_annotations(self, text: str) -> None:
         """

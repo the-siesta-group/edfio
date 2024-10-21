@@ -372,7 +372,7 @@ def test_edf_signal_label_cannot_be_set_to_edf_annotations():
 
 def test_load_portion_of_signal_already_loaded():
     signal = EdfSignal(np.arange(10), sampling_frequency=2, digital_range=(0, 9), physical_range=(0, 9))
-    slice = signal.get_slice(1.5, 3)
+    slice = signal.get_data_slice(1.5, 3)
     np.testing.assert_array_equal(slice, np.arange(3, 9))
 
 
@@ -408,13 +408,16 @@ def lazy_loaded_signal(buffered_lazy_loader: LazyLoader) -> EdfSignal:
     ],
 )
 def test_lazy_load_portion_of_signal(start: float, duration: float, lazy_loaded_signal: EdfSignal):
-    # Expected signal values for the slice.
-    expected_signal = np.arange(1, 13, dtype=np.float64) / 10
-    expected_slice = expected_signal[round(start * 3) : round((start + duration) * 3)]
+    expected_digital_values = np.arange(1, 13, dtype=np.int16)
+    expected_digital_slice = expected_digital_values[round(start * 3) : round((start + duration) * 3)]
+    actual_digital_slice = lazy_loaded_signal.get_digital_slice(start, duration)
+    np.testing.assert_array_equal(actual_digital_slice, expected_digital_slice)
 
-    # Load the slice and compare it to the expected values.
-    actual_slice = lazy_loaded_signal.get_slice(start, duration)
-    np.testing.assert_allclose(actual_slice, expected_slice, atol=1e-14)
+
+    # Expected signal values for the slice.
+    expected_data_slice = expected_digital_slice.astype(np.float64) / 10
+    actual_data_slice = lazy_loaded_signal.get_data_slice(start, duration)
+    np.testing.assert_allclose(actual_data_slice, expected_data_slice, atol=1e-14)
 
 
 @pytest.mark.parametrize(
@@ -428,10 +431,10 @@ def test_lazy_load_portion_of_signal(start: float, duration: float, lazy_loaded_
 )
 def test_lazy_load_portion_of_signal_outside_of_bounds(start: float, duration: float, lazy_loaded_signal: EdfSignal):
     with pytest.raises(ValueError, match="Invalid slice"):
-        lazy_loaded_signal.get_slice(start, duration)
+        lazy_loaded_signal.get_data_slice(start, duration)
 
 
 def test_get_slice_with_no_data_available(lazy_loaded_signal: EdfSignal):
     lazy_loaded_signal._lazy_loader = None
     with pytest.raises(ValueError, match="Signal data not set"):
-        lazy_loaded_signal.get_slice(0, 1)
+        lazy_loaded_signal.get_data_slice(0, 1)
