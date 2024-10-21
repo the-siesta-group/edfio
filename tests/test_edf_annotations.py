@@ -475,4 +475,4 @@ def test_get_annotations_defined_in_timewindow():
         EdfAnnotation(7.8, 1, "D"),
     ]
     edf = Edf(signals=[EdfSignal(np.arange(10), 1)], annotations=all_annotations)
-    assert edf.get_annotations(3.4, 4.2) == tuple(all_annotations[1:3])
+    assert edf.get_annotations(0.9, 6.8) == tuple(all_annotations[1:3])
