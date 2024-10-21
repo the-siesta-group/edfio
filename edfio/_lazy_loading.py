@@ -4,6 +4,13 @@ import numpy as np
 from numpy.typing import NDArray
 
 
+class InvalidRangeOfDataRecordsError(ValueError):
+    def __init__(self, start_record: int, end_record: int, num_records: int):
+        super().__init__(
+            f"Invalid specification of records to load: {start_record}, {end_record}. File contains {num_records} records."
+        )
+
+
 class LazyLoader:
     """
     Class to load data for a single signal from a buffer of EDF data records (array or memmap).
@@ -55,8 +62,8 @@ class LazyLoader:
             or start_record < 0
             or end_record > self.buffer.shape[0]
         ):
-            raise ValueError(
-                f"Invalid specification of records to load: {start_record}, {end_record}."
+            raise InvalidRangeOfDataRecordsError(
+                start_record, end_record, self.buffer.shape[0]
             )
         return self.buffer[
             start_record:end_record, self.start_sample : self.end_sample

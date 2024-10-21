@@ -370,15 +370,30 @@ def test_edf_signal_label_cannot_be_set_to_edf_annotations():
         EdfSignal(np.arange(2), 1).label = "EDF Annotations"
 
 
-def test_load_portion_of_signal_already_loaded():
+def test_get_data_slice_already_loaded():
     signal = EdfSignal(
         np.arange(10),
         sampling_frequency=2,
         digital_range=(0, 9),
         physical_range=(0, 9),
     )
-    slice = signal.get_data_slice(1.5, 3)
+    slice = signal.get_data_slice(1.5, 4.5)
     np.testing.assert_array_equal(slice, np.arange(3, 9))
+
+
+@pytest.mark.parametrize(
+    ("start", "stop"),
+    [
+        (-1.0, 3.0),
+        (1.5, 5.5),
+    ],
+)
+def test_get_data_slice_outside_of_bounds_already_loaded(start: float, stop: float):
+    signal = EdfSignal(
+        np.arange(10), sampling_frequency=2, digital_range=(0, 9), physical_range=(0, 9)
+    )
+    with pytest.raises(ValueError, match="Invalid slice"):
+        signal.get_data_slice(start, stop)
 
 
 @pytest.fixture()
@@ -402,49 +417,47 @@ def lazy_loaded_signal(buffered_lazy_loader: LazyLoader) -> EdfSignal:
 
 
 @pytest.mark.parametrize(
-    ("start", "duration"),
+    ("start", "stop"),
     [
         (0.0, 4.0),
-        (1.0, 2.0),
-        (0.67, 0.33),
-        (2.0, 1.33),
+        (1.0, 3.0),
+        (0.67, 1.0),
+        (2.0, 3.33),
+        (1.33, 2.67),
         (1.33, 1.33),
-        (1.33, 0.0),
     ],
 )
-def test_lazy_load_portion_of_signal(
-    start: float, duration: float, lazy_loaded_signal: EdfSignal
+def test_lazy_load_get_data_slice(
+    start: float, stop: float, lazy_loaded_signal: EdfSignal
 ):
     expected_digital_values = np.arange(1, 13, dtype=np.int16)
-    expected_digital_slice = expected_digital_values[
-        round(start * 3) : round((start + duration) * 3)
-    ]
-    actual_digital_slice = lazy_loaded_signal.get_digital_slice(start, duration)
+    expected_digital_slice = expected_digital_values[round(start * 3) : round(stop * 3)]
+    actual_digital_slice = lazy_loaded_signal.get_digital_slice(start, stop)
     np.testing.assert_array_equal(actual_digital_slice, expected_digital_slice)
 
     # Expected signal values for the slice.
     expected_data_slice = expected_digital_slice.astype(np.float64) / 10
-    actual_data_slice = lazy_loaded_signal.get_data_slice(start, duration)
+    actual_data_slice = lazy_loaded_signal.get_data_slice(start, stop)
     np.testing.assert_allclose(actual_data_slice, expected_data_slice, atol=1e-14)
 
 
 @pytest.mark.parametrize(
-    ("start", "duration"),
+    ("start", "stop"),
     [
-        (-1.0, 4.0),
-        (1.0, 4.0),
-        (4.33, 0.33),
-        (2.0, -1.0),
+        (-1.0, 3.0),
+        (1.0, 5.0),
+        (4.33, 4.67),
+        (2.0, 1.0),
     ],
 )
-def test_lazy_load_portion_of_signal_outside_of_bounds(
-    start: float, duration: float, lazy_loaded_signal: EdfSignal
+def test_lazy_load_get_data_slice_outside_of_bounds(
+    start: float, stop: float, lazy_loaded_signal: EdfSignal
 ):
     with pytest.raises(ValueError, match="Invalid slice"):
-        lazy_loaded_signal.get_data_slice(start, duration)
+        lazy_loaded_signal.get_data_slice(start, stop)
 
 
-def test_get_slice_with_no_data_available(lazy_loaded_signal: EdfSignal):
+def test_get_data_slice_with_no_data_available(lazy_loaded_signal: EdfSignal):
     lazy_loaded_signal._lazy_loader = None
     with pytest.raises(ValueError, match="Signal data not set"):
         lazy_loaded_signal.get_data_slice(0, 1)

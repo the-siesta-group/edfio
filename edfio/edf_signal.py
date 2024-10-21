@@ -14,7 +14,7 @@ from edfio._header_field import (
     encode_int,
     encode_str,
 )
-from edfio._lazy_loading import LazyLoader
+from edfio._lazy_loading import InvalidRangeOfDataRecordsError, LazyLoader
 
 
 class _IntRange(NamedTuple):
@@ -351,7 +351,7 @@ class EdfSignal:
         return self._calibrate(self.digital)
 
     def get_digital_slice(
-        self, start_second: float, duration: float
+        self, start_second: float, stop_second: float
     ) -> npt.NDArray[np.int16]:
         """
         Get a slice of the digital signal values.
@@ -362,16 +362,19 @@ class EdfSignal:
         ----------
         start_second : float
             The start of the slice in seconds.
-        duration : float
-            The duration of the slice in seconds.
+        stop_second : float
+            The end of the slice in seconds.
         """
+        duration = stop_second - start_second
         if duration < 0:
             raise ValueError("Invalid slice: Duration must be non-negative")
         if start_second < 0:
             raise ValueError("Invalid slice: Start second must be non-negative")
         start_index = round(start_second * self.sampling_frequency)
-        end_index = round((start_second + duration) * self.sampling_frequency)
+        end_index = round(stop_second * self.sampling_frequency)
         if self._digital is not None:
+            if end_index > len(self._digital):
+                raise ValueError("Invalid slice: Slice exceeds EDF duration")
             return self._digital[start_index:end_index]
         if self._lazy_loader is None:
             raise ValueError("Signal data not set")
@@ -381,8 +384,8 @@ class EdfSignal:
             digital_portion = self._lazy_loader.load(
                 first_data_record, last_data_record
             )
-        except Exception as e:
-            raise ValueError("Invalid slice: Slice exceeds EDF duration") from e
+        except InvalidRangeOfDataRecordsError as irdr:
+            raise ValueError("Invalid slice: Slice exceeds EDF duration") from irdr
         offset_within_first_record = start_index % self.samples_per_data_record
         num_samples = end_index - start_index
         return digital_portion[
@@ -390,7 +393,7 @@ class EdfSignal:
         ]
 
     def get_data_slice(
-        self, start_second: float, duration: float
+        self, start_second: float, stop_second: float
     ) -> npt.NDArray[np.float64]:
         """
         Get a slice of the signal data.
@@ -401,10 +404,10 @@ class EdfSignal:
         ----------
         start_second : float
             The start of the slice in seconds.
-        duration : float
-            The duration of the slice in seconds.
+        stop_second : float
+            The end of the slice in seconds.
         """
-        return self._calibrate(self.get_digital_slice(start_second, duration))
+        return self._calibrate(self.get_digital_slice(start_second, stop_second))
 
     def update_data(
         self,

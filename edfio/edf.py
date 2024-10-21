@@ -769,7 +769,7 @@ class Edf:
         return self.num_data_records * self.data_record_duration
 
     def get_annotations(
-        self, start_second: float | None = None, duration: float | None = None
+        self, start_second: float | None = None, stop_second: float | None = None
     ) -> tuple[EdfAnnotation, ...]:
         """
         All annotations defined (starting) in a specified time region of the Edf, sorted chronologically.
@@ -781,30 +781,26 @@ class Edf:
         ----------
         start_second : float, optional
             The start of the time region in seconds from recording start. If not provided, the start of the recording is used.
-        duration : float, optional
-            The duration of the time region in seconds. If not provided, the duration is set until the end of the recording.
+        stop_second : float, optional
+            The end of the time region in seconds. If not provided, the end of the recording is used.
         """
         annotations: list[EdfAnnotation] = []
         start_second_defined = start_second is not None
-        duration_defined = duration is not None
+        stop_second_defined = stop_second is not None
         start_second = start_second or 0
-        duration = duration or self.duration - start_second
+        stop_second = stop_second or self.duration
         for i, signal in enumerate(self._annotation_signals):
             if self.duration == 0 or signal.sampling_frequency == 0:
                 digital_slice = signal.digital
             else:
                 # Make sure to read full data records
-                end_second = start_second + duration
                 start_record = start_second // self.data_record_duration
                 adjusted_start = start_record * self.data_record_duration
                 last_record = ceil(
-                    end_second / self.data_record_duration - 1e-12
+                    stop_second / self.data_record_duration - 1e-12
                 )  # avoid floating point errors
-                adjusted_end = last_record * self.data_record_duration
-                adjusted_duration = adjusted_end - adjusted_start
-                digital_slice = signal.get_digital_slice(
-                    adjusted_start, adjusted_duration
-                )
+                adjusted_stop = last_record * self.data_record_duration
+                digital_slice = signal.get_digital_slice(adjusted_start, adjusted_stop)
             for data_record in digital_slice.reshape(
                 (-1, signal.samples_per_data_record)
             ):
@@ -828,9 +824,8 @@ class Edf:
         if start_second_defined:
             while annotations and annotations[0].onset < start_second:
                 annotations.pop(0)
-        if duration_defined:
-            end_second = start_second + duration
-            while annotations and annotations[-1].onset >= end_second:
+        if stop_second_defined:
+            while annotations and annotations[-1].onset >= stop_second:
                 annotations.pop()
         return tuple(annotations)
 
