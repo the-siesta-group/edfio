@@ -3,7 +3,8 @@
 ## [Unreleased]
 
 ### Added
-- Load a segment of EDF raw data from a signal without reading the entire file using `EdfSignal.get_slice` method ([#58](https://github.com/the-siesta-group/edfio/pull/58)).
+- Load a segment of EDF raw data from a signal without reading the entire file using `EdfSignal.get_data_slice` method ([#58](https://github.com/the-siesta-group/edfio/pull/58)).
+- Load annotations from a specific time window of the EDF file without reading the entire file using `Edf.get_annotations` method ([#58](https://github.com/the-siesta-group/edfio/pull/58)).
 
 ## [0.4.4] - 2024-09-25
 
