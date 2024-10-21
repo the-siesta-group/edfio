@@ -8,6 +8,7 @@ import numpy as np
 import pytest
 
 from edfio import EdfSignal
+from edfio._lazy_loading import LazyLoader
 from edfio.edf_signal import (
     _FloatRange,
     _IntRange,
@@ -367,3 +368,70 @@ def test_edf_signal_init_does_not_accept_edf_annotations_as_label():
 def test_edf_signal_label_cannot_be_set_to_edf_annotations():
     with pytest.raises(ValueError, match="must not be 'EDF Annotations'"):
         EdfSignal(np.arange(2), 1).label = "EDF Annotations"
+
+
+def test_load_portion_of_signal_already_loaded():
+    signal = EdfSignal(np.arange(10), sampling_frequency=2, digital_range=(0, 9), physical_range=(0, 9))
+    slice = signal.get_slice(1.5, 3)
+    np.testing.assert_array_equal(slice, np.arange(3, 9))
+
+
+@pytest.fixture()
+def lazy_loaded_signal(buffered_lazy_loader: LazyLoader) -> EdfSignal:
+    # Simulate initialization of the signal from the buffer.
+    signal = EdfSignal._from_raw_header(
+        sampling_frequency=3,
+        label=b"SpO2",
+        transducer_type=b"Pulse Oximeter",
+        physical_dimension=b"%",
+        physical_min=b"0",
+        physical_max=b"100",
+        digital_min=b"0",
+        digital_max=b"1000",
+        prefiltering=b"",
+        samples_per_data_record=b"3",
+        reserved=b"",
+    )
+    signal._lazy_loader = buffered_lazy_loader
+    return signal
+
+
+@pytest.mark.parametrize(
+    ("start", "duration"),
+    [
+        (0.0, 4.0),
+        (1.0, 2.0),
+        (0.67, 0.33),
+        (2.0, 1.33),
+        (1.33, 1.33),
+        (1.33, 0.0),
+    ],
+)
+def test_lazy_load_portion_of_signal(start: float, duration: float, lazy_loaded_signal: EdfSignal):
+    # Expected signal values for the slice.
+    expected_signal = np.arange(1, 13, dtype=np.float64) / 10
+    expected_slice = expected_signal[round(start * 3) : round((start + duration) * 3)]
+
+    # Load the slice and compare it to the expected values.
+    actual_slice = lazy_loaded_signal.get_slice(start, duration)
+    np.testing.assert_allclose(actual_slice, expected_slice, atol=1e-14)
+
+
+@pytest.mark.parametrize(
+    ("start", "duration"),
+    [
+        (-1.0, 4.0),
+        (1.0, 4.0),
+        (4.33, 0.33),
+        (2.0, -1.0),
+    ],
+)
+def test_lazy_load_portion_of_signal_outside_of_bounds(start: float, duration: float, lazy_loaded_signal: EdfSignal):
+    with pytest.raises(ValueError, match="Invalid slice"):
+        lazy_loaded_signal.get_slice(start, duration)
+
+
+def test_get_slice_with_no_data_available(lazy_loaded_signal: EdfSignal):
+    lazy_loaded_signal._lazy_loader = None
+    with pytest.raises(ValueError, match="Signal data not set"):
+        lazy_loaded_signal.get_slice(0, 1)

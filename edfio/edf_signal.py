@@ -14,6 +14,7 @@ from edfio._header_field import (
     encode_int,
     encode_str,
 )
+from edfio._lazy_loading import LazyLoader
 
 
 class _IntRange(NamedTuple):
@@ -99,7 +100,7 @@ class EdfSignal:
     )
 
     _digital: npt.NDArray[np.int16] | None = None
-    _lazy_loader: Callable[[], npt.NDArray[np.int16]] | None = None
+    _lazy_loader: LazyLoader | None = None
 
     def __init__(
         self,
@@ -309,9 +310,34 @@ class EdfSignal:
         if self._digital is None:
             if self._lazy_loader is None:
                 raise ValueError("Signal data not set")
-            self._digital = self._lazy_loader()
+            self._digital = self._lazy_loader.load()
             self._lazy_loader = None
         return self._digital
+
+    def _calibrate(self, digital: npt.NDArray[np.int16]) -> npt.NDArray[np.float64]:
+        try:
+            gain, offset = _calculate_gain_and_offset(
+                self.digital_min,
+                self.digital_max,
+                self.physical_min,
+                self.physical_max,
+            )
+        except ZeroDivisionError:
+            data = digital.astype(np.float64)
+            if self.digital_max == self.digital_min:
+                warnings.warn(
+                    f"Digital minimum equals digital maximum ({self.digital_min}) for {self.label}, returning uncalibrated signal."
+                )
+            else:
+                warnings.warn(
+                    f"Physical minimum equals physical maximum ({self.physical_min}) for {self.label}, returning uncalibrated signal."
+                )
+        except ValueError:
+            data = digital.astype(np.float64)
+        else:
+            data = (digital + offset) * gain
+        data.setflags(write=False)
+        return data
 
     @property
     def data(self) -> npt.NDArray[np.float64]:
@@ -322,29 +348,48 @@ class EdfSignal:
         individual values in the returned array can not be modified. Use
         :meth:`EdfSignal.update_data` to overwrite with new physical data.
         """
+        return self._calibrate(self.digital)
+
+    def get_slice(
+        self, start_second: float, duration: float
+    ) -> npt.NDArray[np.float64]:
+        """
+        Get a slice of the signal data.
+
+        If the signal has not been loaded into memory so far, only the requested slice will be read.
+
+        Parameters
+        ----------
+        start_second : float
+            The start of the slice in seconds.
+        duration : float
+            The duration of the slice in seconds.
+        """
+        if duration < 0:
+            raise ValueError("Invalid slice: Duration must be non-negative")
+        if start_second < 0:
+            raise ValueError("Invalid slice: Start second must be non-negative")
+        start_index = round(start_second * self.sampling_frequency)
+        end_index = round((start_second + duration) * self.sampling_frequency)
+        if self._digital is not None:
+            return self._calibrate(self._digital[start_index:end_index])
+        if self._lazy_loader is None:
+            raise ValueError("Signal data not set")
+        first_data_record = start_index // self.samples_per_data_record
+        last_data_record = (end_index - 1) // self.samples_per_data_record + 1
         try:
-            gain, offset = _calculate_gain_and_offset(
-                self.digital_min,
-                self.digital_max,
-                self.physical_min,
-                self.physical_max,
+            digital_portion = self._lazy_loader.load(
+                first_data_record, last_data_record
             )
-        except ZeroDivisionError:
-            data = self.digital.astype(np.float64)
-            if self.digital_max == self.digital_min:
-                warnings.warn(
-                    f"Digital minimum equals digital maximum ({self.digital_min}) for {self.label}, returning uncalibrated signal."
-                )
-            else:
-                warnings.warn(
-                    f"Physical minimum equals physical maximum ({self.physical_min}) for {self.label}, returning uncalibrated signal."
-                )
-        except ValueError:
-            data = self.digital.astype(np.float64)
-        else:
-            data = (self.digital + offset) * gain
-        data.setflags(write=False)
-        return data
+        except Exception as e:
+            raise ValueError("Invalid slice: Slice exceeds EDF duration") from e
+        offset_within_first_record = start_index % self.samples_per_data_record
+        num_samples = end_index - start_index
+        return self._calibrate(
+            digital_portion[
+                offset_within_first_record : offset_within_first_record + num_samples
+            ]
+        )
 
     def update_data(
         self,

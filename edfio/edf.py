@@ -16,7 +16,6 @@ from pathlib import Path
 from typing import Any, Literal
 
 import numpy as np
-import numpy.typing as npt
 
 from edfio._header_field import (
     decode_date,
@@ -29,6 +28,7 @@ from edfio._header_field import (
     encode_str,
     encode_time,
 )
+from edfio._lazy_loading import LazyLoader
 from edfio.edf_annotations import (
     EdfAnnotation,
     _create_annotations_signal,
@@ -248,11 +248,7 @@ class Edf:
 
         for signal, start, end in zip(self._signals, starts, ends):
             if lazy_load_data:
-
-                def lazy_load(s: int = start, e: int = end) -> npt.NDArray[np.int16]:
-                    return datarecords[:, s:e].flatten()
-
-                signal._lazy_loader = lazy_load
+                signal._lazy_loader = LazyLoader(datarecords, start, end)
             else:
                 signal._digital = datarecords[:, start:end].flatten()
 
