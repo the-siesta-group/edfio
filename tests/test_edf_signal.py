@@ -46,7 +46,6 @@ from edfio.edf_signal import (
         (-1111111.5,    -1111112,         -1111112,         -1111111,),
     ],
 )
-# fmt: on
 def test_round_float_to_8_characters(
     value: float,
     expected_round: float,
@@ -56,6 +55,7 @@ def test_round_float_to_8_characters(
     assert _round_float_to_8_characters(value, round) == expected_round
     assert _round_float_to_8_characters(value, math.floor) == expected_floor
     assert _round_float_to_8_characters(value, math.ceil) == expected_ceil
+# fmt: on
 
 
 def sine(duration, f, fs):
@@ -371,7 +371,12 @@ def test_edf_signal_label_cannot_be_set_to_edf_annotations():
 
 
 def test_load_portion_of_signal_already_loaded():
-    signal = EdfSignal(np.arange(10), sampling_frequency=2, digital_range=(0, 9), physical_range=(0, 9))
+    signal = EdfSignal(
+        np.arange(10),
+        sampling_frequency=2,
+        digital_range=(0, 9),
+        physical_range=(0, 9),
+    )
     slice = signal.get_data_slice(1.5, 3)
     np.testing.assert_array_equal(slice, np.arange(3, 9))
 
@@ -407,12 +412,15 @@ def lazy_loaded_signal(buffered_lazy_loader: LazyLoader) -> EdfSignal:
         (1.33, 0.0),
     ],
 )
-def test_lazy_load_portion_of_signal(start: float, duration: float, lazy_loaded_signal: EdfSignal):
+def test_lazy_load_portion_of_signal(
+    start: float, duration: float, lazy_loaded_signal: EdfSignal
+):
     expected_digital_values = np.arange(1, 13, dtype=np.int16)
-    expected_digital_slice = expected_digital_values[round(start * 3) : round((start + duration) * 3)]
+    expected_digital_slice = expected_digital_values[
+        round(start * 3) : round((start + duration) * 3)
+    ]
     actual_digital_slice = lazy_loaded_signal.get_digital_slice(start, duration)
     np.testing.assert_array_equal(actual_digital_slice, expected_digital_slice)
-
 
     # Expected signal values for the slice.
     expected_data_slice = expected_digital_slice.astype(np.float64) / 10
@@ -429,7 +437,9 @@ def test_lazy_load_portion_of_signal(start: float, duration: float, lazy_loaded_
         (2.0, -1.0),
     ],
 )
-def test_lazy_load_portion_of_signal_outside_of_bounds(start: float, duration: float, lazy_loaded_signal: EdfSignal):
+def test_lazy_load_portion_of_signal_outside_of_bounds(
+    start: float, duration: float, lazy_loaded_signal: EdfSignal
+):
     with pytest.raises(ValueError, match="Invalid slice"):
         lazy_loaded_signal.get_data_slice(start, duration)
 
