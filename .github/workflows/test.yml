@@ -28,6 +28,7 @@ jobs:
         uses: astral-sh/setup-uv@v3
         with:
           enable-cache: true
+          cache-dependency-glob: "**/pyproject.toml"
       - name: Pre-commit
         run: uv run --python=3.9 --extra dev --with numpy==1.22.2 pre-commit run --all-files
 
@@ -57,6 +58,7 @@ jobs:
         uses: astral-sh/setup-uv@v3
         with:
           enable-cache: true
+          cache-dependency-glob: "**/pyproject.toml"
       - name: Install Python ${{ matrix.python-version }}
         run: uv python install ${{ matrix.python-version }}
       - name: Pytest
