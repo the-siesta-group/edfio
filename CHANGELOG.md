@@ -1,6 +1,8 @@
 # Changelog
 
-## [Unreleased]
+## Unreleased
+
+## [0.4.5] - 2024-10-28
 
 ### Added
 - Load a segment of EDF raw data from a signal without reading the entire file using `EdfSignal.get_data_slice` method ([#58](https://github.com/the-siesta-group/edfio/pull/58)).
