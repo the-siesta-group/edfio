@@ -14,7 +14,7 @@ from edfio._header_field import (
     encode_int,
     encode_str,
 )
-from edfio._lazy_loading import InvalidRangeOfDataRecordsError, LazyLoader
+from edfio._lazy_loading import LazyLoader
 
 
 class _IntRange(NamedTuple):
@@ -380,12 +380,7 @@ class EdfSignal:
             raise ValueError("Signal data not set")
         first_data_record = start_index // self.samples_per_data_record
         last_data_record = (end_index - 1) // self.samples_per_data_record + 1
-        try:
-            digital_portion = self._lazy_loader.load(
-                first_data_record, last_data_record
-            )
-        except InvalidRangeOfDataRecordsError as irdr:
-            raise ValueError("Invalid slice: Slice exceeds EDF duration") from irdr
+        digital_portion = self._lazy_loader.load(first_data_record, last_data_record)
         offset_within_first_record = start_index % self.samples_per_data_record
         num_samples = end_index - start_index
         return digital_portion[

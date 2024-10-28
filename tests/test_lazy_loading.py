@@ -25,5 +25,5 @@ def test_load_some_records(buffered_lazy_loader: LazyLoader):
 def test_load_invalid_records(
     start_record: int, end_record: int, buffered_lazy_loader: LazyLoader
 ):
-    with pytest.raises(ValueError, match="Invalid specification of records to load"):
+    with pytest.raises(ValueError, match="Invalid slice: Slice exceeds EDF duration"):
         buffered_lazy_loader.load(start_record, end_record)
