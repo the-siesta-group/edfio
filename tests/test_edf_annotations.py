@@ -465,3 +465,14 @@ def test_add_annotations(tmp_file: Path):
     edf.write(tmp_file)
     edf = read_edf(tmp_file)
     assert edf.annotations == tuple(sorted(old_annotations + new_annotations))
+
+
+def test_get_annotations_defined_in_timewindow():
+    all_annotations = [
+        EdfAnnotation(0.15, 3, "A"),
+        EdfAnnotation(3.5, 1, "B"),
+        EdfAnnotation(5, 1, "C"),
+        EdfAnnotation(7.8, 1, "D"),
+    ]
+    edf = Edf(signals=[EdfSignal(np.arange(10), 1)], annotations=all_annotations)
+    assert edf.get_annotations(0.9, 7.6) == tuple(all_annotations[1:3])

@@ -1174,7 +1174,6 @@ def test_sampling_frequencies_leading_to_floating_point_issues_in_signal_duratio
         (0,              11,                  "EDF header indicates 11 data records, but file contains 10 records. Updating header."),
     ],
 )
-# fmt: on
 def test_read_edf_with_invalid_number_of_records(
     tmp_path: Path,
     extra_bytes: int,
@@ -1197,11 +1196,14 @@ def test_read_edf_with_invalid_number_of_records(
         comparison_edf = read_edf(EDF_FILE)
         for signal, comparison_signal in zip(edf.signals, comparison_edf.signals):
             np.testing.assert_array_equal(signal.data, comparison_signal.data)
+# fmt: on
 
 
 def test_fail_lazy_load():
     edf_data = EDF_FILE.read_bytes()
-    with pytest.raises(ValueError, match="Lazy loading is only supported for local file paths"):
+    with pytest.raises(
+        ValueError, match="Lazy loading is only supported for local file paths"
+    ):
         read_edf(edf_data, lazy_load_data=True)
 
 

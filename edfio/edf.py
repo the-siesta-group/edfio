@@ -16,7 +16,6 @@ from pathlib import Path
 from typing import Any, Literal
 
 import numpy as np
-import numpy.typing as npt
 
 from edfio._header_field import (
     decode_date,
@@ -29,6 +28,7 @@ from edfio._header_field import (
     encode_str,
     encode_time,
 )
+from edfio._lazy_loading import LazyLoader
 from edfio.edf_annotations import (
     EdfAnnotation,
     _create_annotations_signal,
@@ -248,11 +248,7 @@ class Edf:
 
         for signal, start, end in zip(self._signals, starts, ends):
             if lazy_load_data:
-
-                def lazy_load(s: int = start, e: int = end) -> npt.NDArray[np.int16]:
-                    return datarecords[:, s:e].flatten()
-
-                signal._lazy_loader = lazy_load
+                signal._lazy_loader = LazyLoader(datarecords, start, end)
             else:
                 signal._digital = datarecords[:, start:end].flatten()
 
@@ -772,16 +768,40 @@ class Edf:
         """Recording duration in seconds."""
         return self.num_data_records * self.data_record_duration
 
-    @property
-    def annotations(self) -> tuple[EdfAnnotation, ...]:
+    def get_annotations(
+        self, start_second: float | None = None, stop_second: float | None = None
+    ) -> tuple[EdfAnnotation, ...]:
         """
-        All annotations contained in the Edf, sorted chronologically.
+        All annotations defined (starting) in a specified time region of the Edf, sorted chronologically.
 
-        Does not include timekeeping annotations.
+        Does not include timekeeping annotations. Will not include annotations that start within the specified time region but are
+        defined in data records outside of that window.
+
+        Parameters
+        ----------
+        start_second : float, optional
+            The start of the time region in seconds from recording start. If not provided, the start of the recording is used.
+        stop_second : float, optional
+            The end of the time region in seconds. If not provided, the end of the recording is used.
         """
         annotations: list[EdfAnnotation] = []
+        start_second_defined = start_second is not None
+        stop_second_defined = stop_second is not None
+        start_second = start_second or 0
+        stop_second = stop_second or self.duration
         for i, signal in enumerate(self._annotation_signals):
-            for data_record in signal.digital.reshape(
+            if self.duration == 0 or signal.sampling_frequency == 0:
+                digital_slice = signal.digital
+            else:
+                # Make sure to read full data records
+                start_record = start_second // self.data_record_duration
+                adjusted_start = start_record * self.data_record_duration
+                last_record = ceil(
+                    stop_second / self.data_record_duration - 1e-12
+                )  # avoid floating point errors
+                adjusted_stop = last_record * self.data_record_duration
+                digital_slice = signal.get_digital_slice(adjusted_start, adjusted_stop)
+            for data_record in digital_slice.reshape(
                 (-1, signal.samples_per_data_record)
             ):
                 annot_dr = _EdfAnnotationsDataRecord.from_bytes(data_record.tobytes())
@@ -800,7 +820,23 @@ class Edf:
             )
             for ann in annotations
         ]
-        return tuple(sorted(annotations))
+        annotations = sorted(annotations)
+        if start_second_defined:
+            while annotations and annotations[0].onset < start_second:
+                annotations.pop(0)
+        if stop_second_defined:
+            while annotations and annotations[-1].onset >= stop_second:
+                annotations.pop()
+        return tuple(annotations)
+
+    @property
+    def annotations(self) -> tuple[EdfAnnotation, ...]:
+        """
+        All annotations contained in the Edf, sorted chronologically.
+
+        Does not include timekeeping annotations.
+        """
+        return self.get_annotations()
 
     def drop_annotations(self, text: str) -> None:
         """
