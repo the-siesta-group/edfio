@@ -28,7 +28,7 @@ dynamic = ["version"]
 [tool.hatch.build.targets.sdist]
 only-include = ["edfio"]
 
-[project.optional-dependencies]
+[dependency-groups]
 dev = [
     "pytest==7.4.3",
     "pytest-cov==4.1.0",

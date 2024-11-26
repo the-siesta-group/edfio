@@ -31,7 +31,7 @@ We suggest to use [`uv`](https://docs.astral.sh/uv/getting-started/installation/
 
 Create a virtual environment with Python 3.9 and install all dependencies:
 
-    uv sync --python=3.9 --all-extras
+    uv sync --python=3.9
 
 **When using `uv`, prepend the commands below with `uv run` to make sure they are executed in the virtual environment!**
 

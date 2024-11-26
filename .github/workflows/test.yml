@@ -47,7 +47,7 @@ jobs:
         run: uv python install ${{ matrix.python-version }}
       - name: Pre-commit
         run: |
-          uv run --extra dev --with ${{ matrix.numpy }} pre-commit run --all-files
+          uv run --with ${{ matrix.numpy }} pre-commit run --all-files
       - name: Pytest
         run: |
-          uv run --extra dev --with ${{ matrix.numpy }} pytest -Werror --cov --cov-report term-missing --cov-fail-under=100
+          uv run --with ${{ matrix.numpy }} pytest -Werror --cov --cov-report term-missing --cov-fail-under=100

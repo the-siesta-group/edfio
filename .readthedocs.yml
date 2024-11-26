@@ -9,7 +9,7 @@ build:
     python: "3.9"
   commands:
     - pip install uv
-    - uv run --extra dev python -m sphinx -T -b html -d docs/_build/doctrees -D language=en docs/source $READTHEDOCS_OUTPUT/html
+    - uv run python -m sphinx -T -b html -d docs/_build/doctrees -D language=en docs/source $READTHEDOCS_OUTPUT/html
 
 sphinx:
   configuration: docs/source/conf.py
