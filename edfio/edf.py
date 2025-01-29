@@ -79,6 +79,8 @@ class Edf:
     annotations : Iterable[EdfAnnotation] | None, default: None
         The annotations, consisting of onset, duration (optional), and text. If not
         `None`, an EDF+C file is created.
+    fmt : str, default "edf"
+        Can be "edf" or "bdf" to handle EDF or BDF data, respectively.
     """
 
     _header_fields = (
@@ -104,6 +106,7 @@ class Edf:
         starttime: datetime.time | None = None,
         data_record_duration: float | None = None,
         annotations: Iterable[EdfAnnotation] | None = None,
+        fmt: Literal["edf", "bdf"] = "edf",
     ):
         if not signals and not annotations:
             raise ValueError("Edf must contain either signals or annotations")
@@ -130,6 +133,7 @@ class Edf:
         self._set_reserved("")
         if starttime.microsecond and annotations is None:
             warnings.warn("Creating EDF+C to store microsecond starttime.")
+        self._fmt = fmt
         if annotations is not None or starttime.microsecond:
             signals = (
                 *signals,
@@ -138,6 +142,7 @@ class Edf:
                     num_data_records=self.num_data_records,
                     data_record_duration=self.data_record_duration,
                     subsecond_offset=starttime.microsecond / 1_000_000,
+                    fmt=self._fmt,
                 ),
             )
             self._set_reserved("EDF+C")
@@ -213,6 +218,7 @@ class Edf:
         lens = [signal.samples_per_data_record for signal in self._signals]
         datarecord_len = sum(lens)
         truncated = False
+        # TODO: THIS NEEDS FIXING FOR BDF
         if not isinstance(file, Path):
             data_bytes = file.read()
             actual_records = len(data_bytes) // (datarecord_len * 2)
@@ -272,6 +278,11 @@ class Edf:
 
     def _set_signals(self, signals: Sequence[EdfSignal]) -> None:
         signals = tuple(signals)
+        for si, signal in enumerate(signals):
+            if signal._fmt != self._fmt:
+                raise ValueError(
+                    f"Signal {si} ({signal}) has format {signal._fmt}, but EDF is {self._fmt}"
+                )
         self._set_num_data_records_with_signals(signals)
         self._signals = signals
         self._set_bytes_in_header_record(256 * (len(signals) + 1))
@@ -362,10 +373,13 @@ class Edf:
         lens = [signal.samples_per_data_record for signal in self._signals]
         ends = np.cumsum(lens)
         starts = ends - lens
-        data_record = np.empty((num_data_records, sum(lens)), dtype=np.int16)
+        dtype = "<i2" if self._fmt == "edf" else "<i4"
+        data_record = np.empty((num_data_records, sum(lens)), dtype=dtype)
         for signal, start, end in zip(self._signals, starts, ends):
             data_record[:, start:end] = signal.digital.reshape((-1, end - start))
-
+        if self._fmt == "bdf":
+            data_record[data_record < 0] += 1 << 24
+            data_record = data_record.view(np.uint8).reshape(-1, 4)[:, :3]
         if isinstance(target, str):
             target = Path(target)
         if isinstance(target, io.BufferedWriter):
@@ -659,6 +673,7 @@ class Edf:
                 data_record_duration=data_record_duration,
                 with_timestamps=signal is self._timekeeping_signal,
                 subsecond_offset=self._subsecond_offset,
+                fmt=self._fmt,
             )
         self._signals = tuple(signals)
 
@@ -877,6 +892,7 @@ class Edf:
             num_data_records=self.num_data_records,
             data_record_duration=self.data_record_duration,
             subsecond_offset=self.starttime.microsecond / 1_000_000,
+            fmt=self._fmt,
         )
         self._set_signals((*self.signals, new_annotation_signal))
 
@@ -1065,6 +1081,7 @@ class Edf:
             data_record_duration=self.data_record_duration,
             with_timestamps=is_timekeeping_signal,
             subsecond_offset=self._subsecond_offset + start - int(start),
+            fmt=self._fmt,
         )
 
 

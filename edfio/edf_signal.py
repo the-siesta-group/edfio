@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import math
 import warnings
-from typing import Callable, NamedTuple
+from typing import Callable, Literal, NamedTuple
 
 import numpy as np
 import numpy.typing as npt
@@ -79,11 +79,14 @@ class EdfSignal:
     physical_range : tuple[float, float] | None, default: None
         The physical range given as a tuple of `(physical_min, physical_max)`. If
         `None`, this is determined from the data.
-    digital_range : tuple[int, int], default: `(-32768, 32767)`
+    digital_range : tuple[int, int] | None, default: None
         The digital range given as a tuple of `(digital_min, digital_max)`. Uses the
-        maximum resolution of 16-bit integers by default.
+        maximum resolution of 16-bit integers when fmt is "edf" and for 24-bit
+         integers when fmt is "bdf" by default.
     prefiltering : str, default: `""`
         The signal prefiltering, e.g., `"HP:0.1Hz LP:75Hz"`.
+    fmt : str, default `"edf"`
+        The data format. Can be `"edf"` or `"bdf"`.
     """
 
     _header_fields = (
@@ -99,7 +102,7 @@ class EdfSignal:
         ("reserved", 32),
     )
 
-    _digital: npt.NDArray[np.int16] | None = None
+    _digital: npt.NDArray[np.int16 | np.int32] | None = None
     _lazy_loader: LazyLoader | None = None
 
     def __init__(
@@ -111,14 +114,18 @@ class EdfSignal:
         transducer_type: str = "",
         physical_dimension: str = "",
         physical_range: tuple[float, float] | None = None,
-        digital_range: tuple[int, int] = (-32768, 32767),
+        digital_range: tuple[int, int] | None = None,
         prefiltering: str = "",
+        fmt: Literal["edf", "bdf"] = "edf",
     ):
         self._sampling_frequency = sampling_frequency
         self.label = label
         self.transducer_type = transducer_type
         self.physical_dimension = physical_dimension
         self.prefiltering = prefiltering
+        self._fmt = fmt
+        if digital_range is None:
+            digital_range = (-8388608, 8388607) if fmt == "bdf" else (-32768, 32767)
         self._set_reserved("")
         if not np.all(np.isfinite(data)):
             raise ValueError("Signal data must contain only finite values")
@@ -301,7 +308,7 @@ class EdfSignal:
         return self._sampling_frequency
 
     @property
-    def digital(self) -> npt.NDArray[np.int16]:
+    def digital(self) -> npt.NDArray[np.int16 | np.int32]:
         """
         Numpy array containing the digital (uncalibrated) signal values as 16-bit integers.
 
@@ -314,7 +321,7 @@ class EdfSignal:
             self._lazy_loader = None
         return self._digital
 
-    def _calibrate(self, digital: npt.NDArray[np.int16]) -> npt.NDArray[np.float64]:
+    def _calibrate(self, digital: npt.NDArray[np.int16 | np.int32]) -> npt.NDArray[np.float64]:
         try:
             gain, offset = _calculate_gain_and_offset(
                 self.digital_min,
@@ -352,7 +359,7 @@ class EdfSignal:
 
     def get_digital_slice(
         self, start_second: float, stop_second: float
-    ) -> npt.NDArray[np.int16]:
+    ) -> npt.NDArray[np.int16 | np.int32]:
         """
         Get a slice of the digital signal values.
 
@@ -499,4 +506,5 @@ class EdfSignal:
             self.physical_min,
             self.physical_max,
         )
-        self._digital = np.round(data / gain - offset).astype(np.int16)
+        dtype = np.int32 if self._fmt == "bdf" else np.int16
+        self._digital = np.round(data / gain - offset).astype(dtype)

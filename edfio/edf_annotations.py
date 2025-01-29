@@ -61,6 +61,7 @@ def _create_annotations_signal(
     data_record_duration: float,
     with_timestamps: bool = True,
     subsecond_offset: float = 0,
+    fmt: Literal["edf", "bdf"] = "edf",
 ) -> EdfSignal:
     data_record_starts = np.arange(num_data_records) * data_record_duration
     annotations = sorted(annotations)
@@ -92,7 +93,8 @@ def _create_annotations_signal(
     signal = EdfSignal(
         np.arange(1.0),  # placeholder signal, as argument `data` is non-optional
         sampling_frequency=maxlen // 2 / divisor,
-        physical_range=(-32768, 32767),
+        physical_range=(-32768, 32767) if fmt == "edf" else (-8388608, 8388607),
+        fmt=fmt,
     )
     signal._label = b"EDF Annotations "
     signal._set_samples_per_data_record(maxlen // 2)
