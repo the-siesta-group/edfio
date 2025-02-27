@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## [0.4.6] - 2025-02-27
+
 ### Fixed
 - Improve efficiency of creating annotations signals in EDF+ files ([#65](https://github.com/the-siesta-group/edfio/pull/65)).
 
