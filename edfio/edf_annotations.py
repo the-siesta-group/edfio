@@ -70,19 +70,15 @@ def _create_annotations_signal(
         tals: list[_EdfTAL] = []
         if with_timestamps:
             tals.append(_EdfTAL(np.round(start + subsecond_offset, 12), None, [""]))
-        for ann in annotations:
-            if (
-                (i == 0 and ann.onset < 0)
-                or (i == (num_data_records - 1) and end <= ann.onset)
-                or (start <= ann.onset < end)
-            ):
-                tals.append(
-                    _EdfTAL(
-                        np.round(ann.onset + subsecond_offset, 12),
-                        ann.duration,
-                        [ann.text],
-                    )
+        while annotations and (annotations[0].onset < end or i == num_data_records - 1):
+            ann = annotations.pop(0)
+            tals.append(
+                _EdfTAL(
+                    np.round(ann.onset + subsecond_offset, 12),
+                    ann.duration,
+                    [ann.text],
                 )
+            )
         data_records.append(_EdfAnnotationsDataRecord(tals).to_bytes())
     maxlen = max(len(data_record) for data_record in data_records)
     if maxlen % 2:
