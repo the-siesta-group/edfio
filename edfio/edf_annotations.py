@@ -70,7 +70,8 @@ def _create_annotations_signal(
         tals: list[_EdfTAL] = []
         if with_timestamps:
             tals.append(_EdfTAL(np.round(start + subsecond_offset, 12), None, [""]))
-        for ann in annotations:
+        while annotations and (annotations[0].onset < end or i == num_data_records - 1):
+            ann = annotations.pop(0)
             if (
                 (i == 0 and ann.onset < 0)
                 or (i == (num_data_records - 1) and end <= ann.onset)

@@ -1222,3 +1222,12 @@ def test_lazy_loading_defaults_to_true_for_paths():
     for signal in edf.signals:
         assert signal._digital is None
         assert signal._lazy_loader is not None
+
+
+@pytest.mark.timeout(10)
+def test_create_edf_with_many_annotations():
+    duration = 8 * 3600
+    signals = [EdfSignal(np.zeros(duration * 10), 10)]
+    annotations = [EdfAnnotation(second + 0.5, None, "A") for second in range(duration)]
+    edf = Edf(signals, annotations=annotations)
+    assert edf is not None
