@@ -1,6 +1,7 @@
 # Changelog
 
 ## Unreleased
+- Fix annotations with None duration raise exceptions ([#67](https://github.com/the-siesta-group/edfio/pull/67)) ([JohnAtl](https://github.com/JohnAtl))
 
 ## [0.4.6] - 2025-02-27
 
