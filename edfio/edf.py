@@ -820,7 +820,10 @@ class Edf:
             )
             for ann in annotations
         ]
-        annotations = sorted(annotations)
+        annotations = sorted(
+            annotations,
+            key=lambda ann: (ann.onset, ann.duration is None, ann.duration if ann.duration is not None else 0),
+        )
         if start_second_defined:
             while annotations and annotations[0].onset < start_second:
                 annotations.pop(0)
