@@ -1,7 +1,9 @@
 # Changelog
 
 ## Unreleased
-- Fix annotations with None duration raise exceptions ([#67](https://github.com/the-siesta-group/edfio/pull/67)) ([JohnAtl](https://github.com/JohnAtl))
+
+### Fixed
+- Allow having annotations with and without durations in the same recording ([#67](https://github.com/the-siesta-group/edfio/pull/67)) ([JohnAtl](https://github.com/JohnAtl))
 
 ## [0.4.6] - 2025-02-27
 
