@@ -6,12 +6,12 @@ import pytest
 from edfio._lazy_loading import LazyLoader
 
 
-@pytest.fixture()
+@pytest.fixture
 def tmp_file(tmp_path: Path) -> Path:
     return tmp_path / "target.edf"
 
 
-@pytest.fixture()
+@pytest.fixture
 def buffered_lazy_loader() -> LazyLoader:
     # Buffer of 4 raw EDF records containing 12 samples for the tested signal.
     # Data for other signals is set to zero.
