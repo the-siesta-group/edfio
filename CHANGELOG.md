@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## [0.4.7] - 2025-03-21
+
 ### Fixed
 - Allow having annotations with and without durations in the same recording ([#67](https://github.com/the-siesta-group/edfio/pull/67)) ([JohnAtl](https://github.com/JohnAtl))
 
