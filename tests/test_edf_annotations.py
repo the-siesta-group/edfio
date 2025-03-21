@@ -476,3 +476,20 @@ def test_get_annotations_defined_in_timewindow():
     ]
     edf = Edf(signals=[EdfSignal(np.arange(10), 1)], annotations=all_annotations)
     assert edf.get_annotations(0.9, 7.6) == tuple(all_annotations[1:3])
+
+
+def test_mixture_of_annotations_with_and_without_durations():
+    annotations = (
+        EdfAnnotation(0.2, 0.5, "B"),
+        EdfAnnotation(0.1, 0, "A"),
+        EdfAnnotation(0.1, None, "A"),
+        EdfAnnotation(0.7, None, "C"),
+    )
+    edf = Edf([], annotations=annotations)
+    edf = read_edf(edf.to_bytes())
+    assert edf.annotations == (
+        EdfAnnotation(0.1, None, "A"),
+        EdfAnnotation(0.1, 0, "A"),
+        EdfAnnotation(0.2, 0.5, "B"),
+        EdfAnnotation(0.7, None, "C"),
+    )

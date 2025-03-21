@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import NamedTuple
+from typing import Any, NamedTuple
 
 import numpy as np
 
@@ -52,6 +52,19 @@ class EdfAnnotation(NamedTuple):
     onset: float
     duration: float | None
     text: str
+
+    def __lt__(self, other: Any) -> bool:
+        if not isinstance(other, EdfAnnotation):
+            return NotImplemented  # pragma: no cover
+        return (
+            self.onset,
+            -1 if self.duration is None else self.duration,
+            self.text,
+        ) < (
+            other.onset,
+            -1 if other.duration is None else other.duration,
+            other.text,
+        )
 
 
 def _create_annotations_signal(
