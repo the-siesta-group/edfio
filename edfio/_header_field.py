@@ -29,7 +29,7 @@ def encode_str(value: str, length: int) -> bytes:
 
 
 def decode_str(field: bytes) -> str:
-    return field.decode(errors="replace").rstrip()
+    return field.decode("latin-1", errors="replace").rstrip()
 
 
 def encode_int(value: int, length: int) -> bytes:

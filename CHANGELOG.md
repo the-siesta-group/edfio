@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+### Fixed
+- Support latin characters in fields ([#68](https://github.com/the-siesta-group/edfio/pull/68)) ([JohnAtl](https://github.com/JohnAtl))
+
 ## [0.4.7] - 2025-03-21
 
 ### Fixed
