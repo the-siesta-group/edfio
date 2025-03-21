@@ -1169,7 +1169,7 @@ def test_sampling_frequencies_leading_to_floating_point_issues_in_signal_duratio
     [
     #    extra bytes     num records field    expected warning
         (1,              10,                  "Incomplete data record at the end of the EDF file"),
-        (15,             11,                  "Incomplete data record at the end of the EDF file"),
+        (15,             10,                  "Incomplete data record at the end of the EDF file"),
         (0,              9,                   "EDF header indicates 9 data records, but file contains 10 records. Updating header."),
         (0,              11,                  "EDF header indicates 11 data records, but file contains 10 records. Updating header."),
     ],

@@ -63,7 +63,7 @@ def sine(duration, f, fs):
     return np.sin(2 * np.pi * f * t)
 
 
-@pytest.fixture()
+@pytest.fixture
 def dummy_edf_signal() -> EdfSignal:
     data = sine(5, 2, 128)
     return EdfSignal(data, 128)
@@ -396,7 +396,7 @@ def test_get_data_slice_outside_of_bounds_already_loaded(start: float, stop: flo
         signal.get_data_slice(start, stop)
 
 
-@pytest.fixture()
+@pytest.fixture
 def lazy_loaded_signal(buffered_lazy_loader: LazyLoader) -> EdfSignal:
     # Simulate initialization of the signal from the buffer.
     signal = EdfSignal._from_raw_header(
