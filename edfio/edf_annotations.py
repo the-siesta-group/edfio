@@ -55,7 +55,7 @@ class EdfAnnotation(NamedTuple):
 
     def __lt__(self, other: Any) -> bool:
         if not isinstance(other, EdfAnnotation):
-            return NotImplemented
+            return NotImplemented  # pragma: no cover
         return (
             self.onset,
             -1 if self.duration is None else self.duration,
