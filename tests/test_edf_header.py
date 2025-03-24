@@ -134,9 +134,9 @@ def test_patient_raises_error_if_too_long_for_header_field():
         Patient(code="X" * 81)
 
 
-def test_patient_from_str_raises_error_if_too_long_for_header_field():
+def test_local_patient_identification_raises_error_if_too_long_for_header_field(edf):
     with pytest.raises(ValueError, match="exceeds maximum field length"):
-        Patient._from_str("X" * 81)
+        edf.local_patient_identification = "X" * 81
 
 
 def test_patient_raises_error_on_invalid_characters():
@@ -144,9 +144,9 @@ def test_patient_raises_error_on_invalid_characters():
         Patient(name="ÄÖÜ")
 
 
-def test_patient_from_str_raises_error_on_invalid_characters():
+def test_local_patient_identification_raises_error_on_invalid_characters(edf):
     with pytest.raises(UnicodeEncodeError, match="'ascii' codec can't encode"):
-        Patient._from_str("X X X AÖÜ")
+        edf.local_patient_identification = "X X X ÄÖÜ"
 
 
 def test_recording_from_str(recording: Recording):
@@ -240,9 +240,9 @@ def test_recording_raises_error_if_too_long_for_header_field():
         Recording(equipment_code="X" * 81)
 
 
-def test_recording_from_str_raises_error_if_too_long_for_header_field():
+def test_local_recording_identification_raises_error_if_too_long_for_header_field(edf):
     with pytest.raises(ValueError, match="exceeds maximum field length"):
-        Recording._from_str("X" * 81)
+        edf.local_recording_identification = "X" * 81
 
 
 def test_recording_raises_error_on_invalid_characters():
@@ -250,9 +250,9 @@ def test_recording_raises_error_on_invalid_characters():
         Recording(investigator_technician_code="ÄÖÜ")
 
 
-def test_recording_from_str_raises_error_on_invalid_characters():
+def test_local_recording_identification_raises_error_on_invalid_characters(edf):
     with pytest.raises(UnicodeEncodeError, match="'ascii' codec can't encode"):
-        Recording._from_str("Startdate X ÄÖÜ X X")
+        edf.local_recording_identification = "Startdate X ÄÖÜ X X"
 
 
 def test_setting_edf_recording_with_new_startdate_changes_both_startdate_fields():
