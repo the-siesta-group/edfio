@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## [0.4.8] - 2025-03-26
+
 ### Added
 - Add a parameter `header_encoding="ascii"` to `read_edf()` to support reading header fields that use a character encoding different to ascii ([#68](https://github.com/the-siesta-group/edfio/pull/68)) ([JohnAtl](https://github.com/JohnAtl))
 
