@@ -76,15 +76,18 @@ def _create_annotations_signal(
     subsecond_offset: float = 0,
 ) -> EdfSignal:
     data_record_starts = np.arange(num_data_records) * data_record_duration
-    annotations = sorted(annotations)
+    # list.pop() is O(1) and list.pop(0) is O(n), so using a reversed list is faster
+    annotations = sorted(annotations, reverse=True)
     data_records = []
     for i, start in enumerate(data_record_starts):
         end = start + data_record_duration
         tals: list[_EdfTAL] = []
         if with_timestamps:
             tals.append(_EdfTAL(start + subsecond_offset, None, [""]))
-        while annotations and (annotations[0].onset < end or i == num_data_records - 1):
-            ann = annotations.pop(0)
+        while annotations and (
+            annotations[-1].onset < end or i == num_data_records - 1
+        ):
+            ann = annotations.pop()
             tals.append(
                 _EdfTAL(
                     ann.onset + subsecond_offset,
