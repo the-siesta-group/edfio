@@ -7,12 +7,6 @@ on:
       - 'docs/**'
   workflow_call:
 
-
-concurrency:
-  group: ${{ github.ref }}
-  cancel-in-progress: true
-
-
 jobs:
   pre-commit:
     runs-on: ubuntu-latest
