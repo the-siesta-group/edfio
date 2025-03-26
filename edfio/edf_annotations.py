@@ -82,12 +82,12 @@ def _create_annotations_signal(
         end = start + data_record_duration
         tals: list[_EdfTAL] = []
         if with_timestamps:
-            tals.append(_EdfTAL(np.round(start + subsecond_offset, 12), None, [""]))
+            tals.append(_EdfTAL(start + subsecond_offset, None, [""]))
         while annotations and (annotations[0].onset < end or i == num_data_records - 1):
             ann = annotations.pop(0)
             tals.append(
                 _EdfTAL(
-                    np.round(ann.onset + subsecond_offset, 12),
+                    ann.onset + subsecond_offset,
                     ann.duration,
                     [ann.text],
                 )
