@@ -125,6 +125,7 @@ class EdfSignal:
         self._set_physical_range(physical_range, data)
         self._set_digital_range(digital_range)
         self._set_data(data)
+        self._header_encoding = "ascii"
 
     def __repr__(self) -> str:
         info = f"{self.sampling_frequency:g}Hz"
@@ -147,6 +148,7 @@ class EdfSignal:
         prefiltering: bytes,
         samples_per_data_record: bytes,
         reserved: bytes,
+        header_encoding: str = "ascii",
     ) -> EdfSignal:
         sig = object.__new__(cls)
         sig._sampling_frequency = sampling_frequency
@@ -160,6 +162,7 @@ class EdfSignal:
         sig._prefiltering = prefiltering
         sig._samples_per_data_record = samples_per_data_record
         sig._reserved = reserved
+        sig._header_encoding = header_encoding
         return sig
 
     @classmethod
@@ -215,7 +218,7 @@ class EdfSignal:
     @property
     def label(self) -> str:
         """Signal label, e.g., `"EEG Fpz-Cz"` or `"Body temp"`."""
-        return decode_str(self._label)
+        return decode_str(self._label, self._header_encoding)
 
     @label.setter
     def label(self, label: str) -> None:
@@ -226,7 +229,7 @@ class EdfSignal:
     @property
     def transducer_type(self) -> str:
         """Transducer type, e.g., `"AgAgCl electrode"`."""
-        return decode_str(self._transducer_type)
+        return decode_str(self._transducer_type, self._header_encoding)
 
     @transducer_type.setter
     def transducer_type(self, transducer_type: str) -> None:
@@ -235,7 +238,7 @@ class EdfSignal:
     @property
     def physical_dimension(self) -> str:
         """Physical dimension, e.g., `"uV"` or `"degreeC`."""
-        return decode_str(self._physical_dimension)
+        return decode_str(self._physical_dimension, self._header_encoding)
 
     @physical_dimension.setter
     def physical_dimension(self, physical_dimension: str) -> None:
@@ -264,7 +267,7 @@ class EdfSignal:
     @property
     def prefiltering(self) -> str:
         """Signal prefiltering, e.g., `"HP:0.1Hz LP:75Hz"`."""
-        return decode_str(self._prefiltering)
+        return decode_str(self._prefiltering, self._header_encoding)
 
     @prefiltering.setter
     def prefiltering(self, prefiltering: str) -> None:

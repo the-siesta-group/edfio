@@ -1231,3 +1231,34 @@ def test_create_edf_with_many_annotations():
     annotations = [EdfAnnotation(second + 0.5, None, "A") for second in range(duration)]
     edf = Edf(signals, annotations=annotations)
     assert edf is not None
+
+
+def test_read_edf_with_latin_1_encoded_header_fields(tmp_file: Path):
+    signal = EdfSignal(np.arange(10), 1)
+    signal._label = "Posição".encode("latin-1").ljust(16)
+    signal._transducer_type = "Cânula".encode("latin-1").ljust(80)
+    signal._physical_dimension = "µV".encode("latin-1").ljust(8)
+    signal._prefiltering = "é".encode("latin-1").ljust(80)
+
+    edf = Edf([signal])
+    edf._local_patient_identification = "X X X René".encode("latin-1").ljust(80)
+    edf._local_recording_identification = "Startdate X X Soméone X".encode(
+        "latin-1"
+    ).ljust(80)
+    edf.write(tmp_file)
+
+    edf = read_edf(tmp_file)
+    assert edf.signals[0].label == "Posi��o"
+    assert edf.signals[0].transducer_type == "C�nula"
+    assert edf.signals[0].physical_dimension == "�V"
+    assert edf.signals[0].prefiltering == "�"
+    assert edf.patient.name == "Ren�"
+    assert edf.recording.investigator_technician_code == "Som�one"
+
+    edf = read_edf(tmp_file, header_encoding="latin-1")
+    assert edf.signals[0].label == "Posição"
+    assert edf.signals[0].transducer_type == "Cânula"
+    assert edf.signals[0].physical_dimension == "µV"
+    assert edf.signals[0].prefiltering == "é"
+    assert edf.patient.name == "René"
+    assert edf.recording.investigator_technician_code == "Soméone"

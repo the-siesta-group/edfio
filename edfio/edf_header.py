@@ -114,7 +114,6 @@ class Patient:
 
     @classmethod
     def _from_str(cls, string: str) -> Patient:
-        encode_str(string, 80)
         obj = object.__new__(cls)
         obj._local_patient_identification = string
         return obj
@@ -228,7 +227,6 @@ class Recording:
 
     @classmethod
     def _from_str(cls, string: str) -> Recording:
-        encode_str(string, 80)
         obj = object.__new__(cls)
         obj._local_recording_identification = string
         return obj
