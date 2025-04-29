@@ -526,15 +526,15 @@ def test_edf_slice_between_seconds():
 
 def test_edf_slice_between_seconds_modifies_header_fields():
     edf = Edf(
-        [EdfSignal(np.arange(8 * 3600 * 10), 10)],
+        [EdfSignal(np.arange(1200 * 10), 10)],
         recording=Recording(startdate=datetime.date(1999, 12, 31)),
-        starttime=datetime.time(22, 33, 44, 55555),
+        starttime=datetime.time(23, 55, 44, 55555),
         annotations=(),
     )
-    edf.slice_between_seconds(5 * 3600 + 0.1, 6 * 3600 + 0.1)
+    edf.slice_between_seconds(600 + 0.1, 900 + 0.1)
     assert edf.startdate == datetime.date(2000, 1, 1)
-    assert edf.starttime == datetime.time(3, 33, 44, 155555)
-    assert edf.num_data_records == 3600
+    assert edf.starttime == datetime.time(0, 5, 44, 155555)
+    assert edf.num_data_records == 300
 
 
 @pytest.mark.parametrize(("start", "stop"), [(2, 4.5), (2.5, 4)])
