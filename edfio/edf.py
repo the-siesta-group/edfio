@@ -239,7 +239,7 @@ class Edf:
             warnings.warn(
                 "Incomplete data record at the end of the EDF file. Data was truncated."
             )
-        if self.num_data_records not in (-1, actual_records):
+        if self.num_data_records != actual_records:
             warnings.warn(
                 f"EDF header indicates {self.num_data_records} data records, but file contains {actual_records} records. Updating header."
             )
