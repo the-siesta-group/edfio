@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## [0.4.9] - 2025-05-19
+
 ### Fixed
 - When reading a file where the number of datarecords is set to `-1` in the header, automatically fix the corresponding field and issue a warning ([#74](https://github.com/the-siesta-group/edfio/pull/74)).
 
