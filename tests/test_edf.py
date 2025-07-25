@@ -526,15 +526,15 @@ def test_edf_slice_between_seconds():
 
 def test_edf_slice_between_seconds_modifies_header_fields():
     edf = Edf(
-        [EdfSignal(np.arange(8 * 3600 * 10), 10)],
+        [EdfSignal(np.arange(1200 * 10), 10)],
         recording=Recording(startdate=datetime.date(1999, 12, 31)),
-        starttime=datetime.time(22, 33, 44, 55555),
+        starttime=datetime.time(23, 55, 44, 55555),
         annotations=(),
     )
-    edf.slice_between_seconds(5 * 3600 + 0.1, 6 * 3600 + 0.1)
+    edf.slice_between_seconds(600 + 0.1, 900 + 0.1)
     assert edf.startdate == datetime.date(2000, 1, 1)
-    assert edf.starttime == datetime.time(3, 33, 44, 155555)
-    assert edf.num_data_records == 3600
+    assert edf.starttime == datetime.time(0, 5, 44, 155555)
+    assert edf.num_data_records == 300
 
 
 @pytest.mark.parametrize(("start", "stop"), [(2, 4.5), (2.5, 4)])
@@ -1169,9 +1169,10 @@ def test_sampling_frequencies_leading_to_floating_point_issues_in_signal_duratio
     [
     #    extra bytes     num records field    expected warning
         (1,              10,                  "Incomplete data record at the end of the EDF file"),
-        (15,             11,                  "Incomplete data record at the end of the EDF file"),
+        (15,             10,                  "Incomplete data record at the end of the EDF file"),
         (0,              9,                   "EDF header indicates 9 data records, but file contains 10 records. Updating header."),
         (0,              11,                  "EDF header indicates 11 data records, but file contains 10 records. Updating header."),
+        (0,              -1,                  "EDF header indicates -1 data records, but file contains 10 records. Updating header."),
     ],
 )
 def test_read_edf_with_invalid_number_of_records(
@@ -1222,3 +1223,43 @@ def test_lazy_loading_defaults_to_true_for_paths():
     for signal in edf.signals:
         assert signal._digital is None
         assert signal._lazy_loader is not None
+
+
+@pytest.mark.timeout(10)
+def test_create_edf_with_many_annotations():
+    duration = 8 * 3600
+    signals = [EdfSignal(np.zeros(duration * 10), 10)]
+    annotations = [EdfAnnotation(second + 0.5, None, "A") for second in range(duration)]
+    edf = Edf(signals, annotations=annotations)
+    assert edf is not None
+
+
+def test_read_edf_with_latin_1_encoded_header_fields(tmp_file: Path):
+    signal = EdfSignal(np.arange(10), 1)
+    signal._label = "Posição".encode("latin-1").ljust(16)
+    signal._transducer_type = "Cânula".encode("latin-1").ljust(80)
+    signal._physical_dimension = "µV".encode("latin-1").ljust(8)
+    signal._prefiltering = "é".encode("latin-1").ljust(80)
+
+    edf = Edf([signal])
+    edf._local_patient_identification = "X X X René".encode("latin-1").ljust(80)
+    edf._local_recording_identification = "Startdate X X Soméone X".encode(
+        "latin-1"
+    ).ljust(80)
+    edf.write(tmp_file)
+
+    edf = read_edf(tmp_file)
+    assert edf.signals[0].label == "Posi��o"
+    assert edf.signals[0].transducer_type == "C�nula"
+    assert edf.signals[0].physical_dimension == "�V"
+    assert edf.signals[0].prefiltering == "�"
+    assert edf.patient.name == "Ren�"
+    assert edf.recording.investigator_technician_code == "Som�one"
+
+    edf = read_edf(tmp_file, header_encoding="latin-1")
+    assert edf.signals[0].label == "Posição"
+    assert edf.signals[0].transducer_type == "Cânula"
+    assert edf.signals[0].physical_dimension == "µV"
+    assert edf.signals[0].prefiltering == "é"
+    assert edf.patient.name == "René"
+    assert edf.recording.investigator_technician_code == "Soméone"

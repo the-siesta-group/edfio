@@ -2,6 +2,29 @@
 
 ## Unreleased
 
+## [0.4.9] - 2025-05-19
+
+### Fixed
+- When reading a file where the number of datarecords is set to `-1` in the header, automatically fix the corresponding field and issue a warning ([#74](https://github.com/the-siesta-group/edfio/pull/74)).
+
+## [0.4.8] - 2025-03-26
+
+### Added
+- Add a parameter `header_encoding="ascii"` to `read_edf()` to support reading header fields that use a character encoding different to ascii ([#68](https://github.com/the-siesta-group/edfio/pull/68)) ([JohnAtl](https://github.com/JohnAtl))
+
+### Fixed
+- Use ascii instead of utf-8 as the default character encoding for reading header fields ([#68](https://github.com/the-siesta-group/edfio/pull/68)) ([JohnAtl](https://github.com/JohnAtl))
+
+## [0.4.7] - 2025-03-21
+
+### Fixed
+- Allow having annotations with and without durations in the same recording ([#67](https://github.com/the-siesta-group/edfio/pull/67)) ([JohnAtl](https://github.com/JohnAtl))
+
+## [0.4.6] - 2025-02-27
+
+### Fixed
+- Improve efficiency of creating annotations signals in EDF+ files ([#65](https://github.com/the-siesta-group/edfio/pull/65)).
+
 ## [0.4.5] - 2024-10-28
 
 ### Added

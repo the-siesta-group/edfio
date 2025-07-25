@@ -147,6 +147,7 @@ class Edf:
             )
             self._set_reserved("EDF+C")
         self._set_signals(signals)
+        self._header_encoding = "ascii"
 
     def __repr__(self) -> str:
         signals_text = f"{len(self.signals)} signal"
@@ -189,7 +190,7 @@ class Edf:
         --------
         patient: Parsed representation, as a :class:`Patient` object.
         """
-        return decode_str(self._local_patient_identification)
+        return decode_str(self._local_patient_identification, self._header_encoding)
 
     @local_patient_identification.setter
     def local_patient_identification(self, value: str) -> None:
@@ -204,7 +205,7 @@ class Edf:
         --------
         recording: Parsed representation, as a :class:`Recording` object.
         """
-        return decode_str(self._local_recording_identification)
+        return decode_str(self._local_recording_identification, self._header_encoding)
 
     @local_recording_identification.setter
     def local_recording_identification(self, value: str) -> None:
@@ -244,7 +245,7 @@ class Edf:
             warnings.warn(
                 "Incomplete data record at the end of the EDF file. Data was truncated."
             )
-        if self.num_data_records not in (-1, actual_records):
+        if self.num_data_records != actual_records:
             warnings.warn(
                 f"EDF header indicates {self.num_data_records} data records, but file contains {actual_records} records. Updating header."
             )
@@ -258,11 +259,16 @@ class Edf:
             else:
                 signal._digital = datarecords[:, start:end].flatten()
 
-    def _read_header(self, buffer: io.BufferedReader | io.BytesIO) -> None:
+    def _read_header(
+        self,
+        buffer: io.BufferedReader | io.BytesIO,
+        header_encoding: str,
+    ) -> None:
+        self._header_encoding = header_encoding
         for header_name, length in Edf._header_fields:
             setattr(self, "_" + header_name, buffer.read(length))
         self._signals = self._parse_signal_headers(
-            buffer.read(256 * self._total_num_signals)
+            buffer.read(256 * self._total_num_signals), header_encoding
         )
 
     @property
@@ -315,7 +321,11 @@ class Edf:
                 )
         self._set_num_data_records(num_data_records)
 
-    def _parse_signal_headers(self, raw_signal_headers: bytes) -> tuple[EdfSignal, ...]:
+    def _parse_signal_headers(
+        self,
+        raw_signal_headers: bytes,
+        header_encoding: str,
+    ) -> tuple[EdfSignal, ...]:
         raw_headers_split: dict[str, list[bytes]] = {}
         start = 0
         for header_name, length in EdfSignal._header_fields:
@@ -339,7 +349,11 @@ class Edf:
                 if raw_signal_header["label"].rstrip() == b"EDF Annotations":
                     sampling_frequency = 0
             signals.append(
-                EdfSignal._from_raw_header(sampling_frequency, **raw_signal_header)
+                EdfSignal._from_raw_header(
+                    sampling_frequency,
+                    **raw_signal_header,
+                    header_encoding=header_encoding,
+                )
             )
         return tuple(signals)
 
@@ -1108,31 +1122,39 @@ def _calculate_data_record_duration(signals: Sequence[EdfSignal]) -> float:
 
 
 @singledispatch
-def _read_edf(edf_file: Any, *, lazy_load_data: bool) -> Edf:
+def _read_edf(edf_file: Any, *, lazy_load_data: bool, header_encoding: str) -> Edf:
     edf = object.__new__(Edf)
-    edf._read_header(edf_file)
+    edf._read_header(edf_file, header_encoding)
     edf._load_data(edf_file, lazy_load_data=lazy_load_data)
     return edf
 
 
 @_read_edf.register
-def _(edf_file: Path, *, lazy_load_data: bool) -> Edf:
+def _(edf_file: Path, *, lazy_load_data: bool, header_encoding: str) -> Edf:
     edf = object.__new__(Edf)
     edf_file = edf_file.expanduser()
     with edf_file.open("rb") as file:
-        edf._read_header(file)
+        edf._read_header(file, header_encoding)
     edf._load_data(edf_file, lazy_load_data=lazy_load_data)
     return edf
 
 
 @_read_edf.register
-def _(edf_file: str, *, lazy_load_data: bool) -> Edf:
-    return _read_edf(Path(edf_file), lazy_load_data=lazy_load_data)
+def _(edf_file: str, *, lazy_load_data: bool, header_encoding: str) -> Edf:
+    return _read_edf(
+        Path(edf_file),
+        lazy_load_data=lazy_load_data,
+        header_encoding=header_encoding,
+    )
 
 
 @_read_edf.register
-def _(edf_file: bytes, *, lazy_load_data: bool) -> Edf:
-    return _read_edf(io.BytesIO(edf_file), lazy_load_data=lazy_load_data)
+def _(edf_file: bytes, *, lazy_load_data: bool, header_encoding: str) -> Edf:
+    return _read_edf(
+        io.BytesIO(edf_file),
+        lazy_load_data=lazy_load_data,
+        header_encoding=header_encoding,
+    )
 
 
 # Pyright loses information about parameters for singledispatch functions. Hiding it
@@ -1145,6 +1167,8 @@ def read_edf(
     | bytes
     | tempfile.SpooledTemporaryFile[bytes],
     lazy_load_data: bool | Literal["auto"] = "auto",
+    *,
+    header_encoding: str = "ascii",
 ) -> Edf:
     """
     Read an EDF file into an :class:`Edf` object.
@@ -1159,6 +1183,8 @@ def read_edf(
         If `True`, the raw signal data is not loaded into memory until it is accessed. If `False`,
         the data is loaded immediately. If `"auto"`, the data is loaded lazily if
         the specified edf_file represents a local path and eagerly otherwise.
+    header_encoding : str, default: "ascii"
+        The character encoding to use when reading header fields.
 
     Returns
     -------
@@ -1167,4 +1193,8 @@ def read_edf(
     """
     if lazy_load_data == "auto":
         lazy_load_data = isinstance(edf_file, (Path, str))
-    return _read_edf(edf_file, lazy_load_data=lazy_load_data)
+    return _read_edf(
+        edf_file,
+        lazy_load_data=lazy_load_data,
+        header_encoding=header_encoding,
+    )

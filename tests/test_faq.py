@@ -147,8 +147,10 @@ def test_q11_num_data_records_not_specified(tmp_file: Path):
     edf._num_data_records = b"-1      "
     with pytest.warns(UserWarning, match="num_data_records=-1, determining correct"):
         edf.write(tmp_file)
-    edf = read_edf(tmp_file)
-    assert edf.num_data_records == -1
+    with pytest.warns(UserWarning, match="EDF header indicates -1 data records, but"):
+        edf = read_edf(tmp_file)
+    assert edf.num_data_records == 10
+    assert edf.duration == 10
 
 
 def test_q12_sampling_frequency_below_1hz(tmp_file: Path):

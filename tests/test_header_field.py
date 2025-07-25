@@ -32,9 +32,12 @@ def test_encode_float(value: float, expected: bytes):
     assert encode_float(value) == expected
 
 
-def test_decode_str():
+def test_decode_str_replaces_non_ascii_characters():
     assert decode_str("è".encode("latin-1")) == "�"
-    assert decode_str("è".encode()) == "è"
+
+
+def test_decode_str_with_latin_1_encoding():
+    assert decode_str("è".encode("latin-1"), "latin-1") == "è"
 
 
 @pytest.mark.parametrize("field", [b"1E2345  ", b"-1E2345 "])
