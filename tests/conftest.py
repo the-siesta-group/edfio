@@ -17,6 +17,16 @@ def pytest_configure(config):
     ):
         config.addinivalue_line("markers", marker)
 
+    # Treat uncaught warnings as errors
+    warning_lines = "    error::"
+    warning_lines += r"""
+    error::
+    """
+    for warning_line in warning_lines.split("\n"):
+        warning_line = warning_line.strip()
+        if warning_line and not warning_line.startswith("#"):
+            config.addinivalue_line("filterwarnings", warning_line)
+
 
 @pytest.fixture
 def tmp_file(tmp_path: Path, request: pytest.FixtureRequest) -> Path:
