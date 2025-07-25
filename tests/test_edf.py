@@ -1234,7 +1234,8 @@ def test_create_edf_with_many_annotations():
     assert edf is not None
 
 
-def test_read_edf_with_latin_1_encoded_header_fields(tmp_file: Path):
+def test_read_edf_with_latin_1_encoded_header_fields(tmp_file: Path, klasses):
+    Edf, EdfSignal, _ = klasses
     signal = EdfSignal(np.arange(10), 1)
     signal._label = "Posição".encode("latin-1").ljust(16)
     signal._transducer_type = "Cânula".encode("latin-1").ljust(80)
@@ -1246,9 +1247,12 @@ def test_read_edf_with_latin_1_encoded_header_fields(tmp_file: Path):
     edf._local_recording_identification = "Startdate X X Soméone X".encode(
         "latin-1"
     ).ljust(80)
+    assert edf.num_data_records == 10
     edf.write(tmp_file)
 
     edf = read_edf(tmp_file)
+    assert edf.signals[0].samples_per_data_record == 1
+    assert edf.num_data_records == 10
     assert edf.signals[0].label == "Posi��o"
     assert edf.signals[0].transducer_type == "C�nula"
     assert edf.signals[0].physical_dimension == "�V"

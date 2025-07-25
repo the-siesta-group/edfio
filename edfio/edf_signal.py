@@ -588,6 +588,7 @@ class BdfSignal(_BaseSignal):
 
         The values of the array may be accessed and modified directly.
         """
+        return super().digital
 
     def get_digital_slice(
         self, start_second: float, stop_second: float

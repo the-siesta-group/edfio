@@ -56,7 +56,7 @@ class _Base:
         ("data_record_duration", 8),
         ("num_signals", 4),
     )
-    _signals: tuple[EdfSignal, ...]
+    _signals: tuple[BdfSignal | BdfSignal, ...]
 
     def __init__(
         self,
@@ -173,13 +173,39 @@ class _Base:
     def _load_data(
         self, file: Path | io.BufferedReader | io.BytesIO, *, lazy_load_data: bool
     ) -> None:
-        if lazy_load_data and not isinstance(file, Path):
-            raise ValueError("Lazy loading is only supported for local file paths")
+        if lazy_load_data and (self._fmt == "bdf" or not isinstance(file, Path)):
+            raise ValueError(
+                "Lazy loading is only supported for local file paths in EDF format, "
+                f"got {type(file)} for {self._fmt_pretty} format"
+            )
         lens = [signal.samples_per_data_record for signal in self._signals]
         datarecord_len = sum(lens)
         truncated = False
-        # TODO: THIS NEEDS FIXING FOR BDF
-        if not isinstance(file, Path):
+        # TODO: Someday maybe we can memmap BDF files, but for now let's just read all
+        # https://stackoverflow.com/questions/12080279/how-do-i-create-a-numpy-dtype-that-includes-24-bit-integers
+        if self._fmt == "bdf":
+            if isinstance(file, Path):
+                remaining_bytes = file.stat().st_size - self.bytes_in_header_record
+                data_bytes = file.read_bytes()
+            else:
+                data_bytes = file.read()
+                remaining_bytes = len(data_bytes)
+            actual_records = remaining_bytes // (datarecord_len * 3)
+            if actual_records * datarecord_len * 3 < remaining_bytes:
+                truncated = True
+            datarecords = np.frombuffer(
+                data_bytes, dtype=np.uint8, count=3 * actual_records * datarecord_len
+            )
+            datarecords = datarecords.reshape(-1, 3).astype(np.int32)
+            datarecords = (
+                datarecords[:, 0]
+                + (datarecords[:, 1] << 8)
+                + (datarecords[:, 2] << 16)
+            )
+            # 24th bit determines the sign
+            datarecords[datarecords >= (1 << 23)] -= 1 << 24
+            datarecords.shape = (actual_records, datarecord_len)
+        elif not isinstance(file, Path):
             data_bytes = file.read()
             actual_records = len(data_bytes) // (datarecord_len * 2)
             if actual_records * datarecord_len * 2 < len(data_bytes):
@@ -202,11 +228,13 @@ class _Base:
             )
         if truncated:
             warnings.warn(
-                "Incomplete data record at the end of the EDF file. Data was truncated."
+                f"Incomplete data record at the end of the {self._fmt_pretty} file. "
+                "Data was truncated."
             )
         if self.num_data_records != actual_records:
             warnings.warn(
-                f"EDF header indicates {self.num_data_records} data records, but file contains {actual_records} records. Updating header."
+                f"{self._fmt_pretty} header indicates {self.num_data_records} data "
+                f"records, but file contains {actual_records} records. Updating header."
             )
             self._set_num_data_records(actual_records)
         ends = np.cumsum(lens)
@@ -234,13 +262,17 @@ class _Base:
     def signals(self) -> tuple[EdfSignal | BdfSignal, ...]:
         return tuple(s for s in self._signals if s.label != "EDF Annotations")
 
+    @property
+    def _fmt_pretty(self):
+        return self._fmt.upper()  # "bdf" -> "BDF"
+
     def _set_signals(self, signals: Sequence[EdfSignal | BdfSignal]) -> None:
         signals = tuple(signals)
         for si, signal in enumerate(signals):
             if signal._fmt != self._fmt:
                 raise ValueError(
                     f"Signal {si} ({signal}) has format {signal._fmt}, but "
-                    f"{self.__class__.__name__} is {self._fmt}"
+                    f"{self.__class__.__name__} is {self._fmt_pretty}"
                 )
         self._set_num_data_records_with_signals(signals)
         self._signals = signals
@@ -346,7 +378,7 @@ class _Base:
             data_record[:, start:end] = signal.digital.reshape((-1, end - start))
         if self._fmt == "bdf":
             data_record[data_record < 0] += 1 << 24
-            data_record = data_record.view(np.uint8).reshape(-1, 4)[:, :3]
+            data_record = data_record.view(np.uint8).reshape(-1, 4)[:, :3].ravel()
         if isinstance(target, str):
             target = Path(target)
         if isinstance(target, io.BufferedWriter):
@@ -1091,6 +1123,7 @@ class Edf(_Base):
     """
 
     _fmt = "edf"
+    _signals: tuple[EdfSignal, ...]
 
     @property
     def signals(self) -> tuple[EdfSignal , ...]:
@@ -1115,6 +1148,7 @@ class Bdf(_Base):
     """
 
     _fmt = "bdf"
+    _signals: tuple[BdfSignal, ...]
 
     @property
     def signals(self) -> tuple[BdfSignal , ...]:
@@ -1151,7 +1185,7 @@ def _calculate_data_record_duration(signals: Sequence[EdfSignal]) -> float:
 
 
 @singledispatch
-def _read_edf(edf_file: Any, *, lazy_load_data: bool, header_encoding: str) -> Edf:
+def _read_edf(edf_file: Any, *, lazy_load_data: bool, header_encoding: str) -> Edf | Bdf:
     edf = object.__new__(Edf)
     edf._read_header(edf_file, header_encoding)
     edf._load_data(edf_file, lazy_load_data=lazy_load_data)
@@ -1159,8 +1193,11 @@ def _read_edf(edf_file: Any, *, lazy_load_data: bool, header_encoding: str) -> E
 
 
 @_read_edf.register
-def _(edf_file: Path, *, lazy_load_data: bool, header_encoding: str) -> Edf:
-    edf = object.__new__(Edf)
+def _(edf_file: Path, *, lazy_load_data: bool, header_encoding: str) -> Edf | Bdf:
+    if edf_file.suffix.lower() == ".bdf":
+        edf = object.__new__(Bdf)
+    else:
+        edf = object.__new__(Edf)
     edf_file = edf_file.expanduser()
     with edf_file.open("rb") as file:
         edf._read_header(file, header_encoding)
@@ -1169,7 +1206,7 @@ def _(edf_file: Path, *, lazy_load_data: bool, header_encoding: str) -> Edf:
 
 
 @_read_edf.register
-def _(edf_file: str, *, lazy_load_data: bool, header_encoding: str) -> Edf:
+def _(edf_file: str, *, lazy_load_data: bool, header_encoding: str) -> Edf | Bdf:
     return _read_edf(
         Path(edf_file),
         lazy_load_data=lazy_load_data,
@@ -1211,7 +1248,8 @@ def read_edf(
     lazy_load_data : bool | {"auto"}, default: "auto"
         If `True`, the raw signal data is not loaded into memory until it is accessed. If `False`,
         the data is loaded immediately. If `"auto"`, the data is loaded lazily if
-        the specified edf_file represents a local path and eagerly otherwise.
+        the specified edf_file represents a local path and the extension is not ".bdf"
+        and eagerly otherwise.
     header_encoding : str, default: "ascii"
         The character encoding to use when reading header fields.
 
@@ -1221,7 +1259,10 @@ def read_edf(
         The resulting :class:`Edf` object.
     """
     if lazy_load_data == "auto":
-        lazy_load_data = isinstance(edf_file, (Path, str))
+        lazy_load_data = (
+            isinstance(edf_file, (Path, str))
+            and not str(edf_file).endswith(".bdf")
+        )
     return _read_edf(
         edf_file,
         lazy_load_data=lazy_load_data,
