@@ -40,49 +40,10 @@ from edfio.edf_header import (
     Recording,
     _encode_edfplus_date,
 )
-from edfio.edf_signal import EdfSignal
+from edfio.edf_signal import BdfSignal, EdfSignal
 
 
-class Edf:
-    """Python representation of an EDF file.
-
-    EDF header fields are exposed as properties with appropriate data types (i.e.,
-    string, numeric, date, or time objects). Fields that might break the file on
-    modification (i.e., `version`, `bytes_in_header_record`, `reserved`,
-    `num_data_records`, `data_record_duration`, and `num_signals`) can not be set after
-    instantiation.
-
-    Note that the startdate has to be set via the parameter `recording`.
-
-    For writing an EDF file with a non-integer seconds duration, currently an
-    appropriate value for `data_record_duration` has to be provided manually.
-
-    Parameters
-    ----------
-    signals : Sequence[EdfSignal]
-        The (non-annotation) signals to be contained in the EDF file.
-    patient : Patient | None, default: None
-        The "local patient identification", containing patient code, sex, birthdate,
-        name, and optional additional fields. If `None`, the field is set to `X X X X`
-        in accordance with EDF+ specs.
-    recording : Recording | None, default: None
-        The "local recording identification", containing recording startdate, hospital
-        administration code, investigator/technical code, equipment code, and optional
-        additional fields. If `None`, the field is set to `Startdate X X X X` in
-        accordance with EDF+ specs.
-    starttime : datetime.time | None, default: None
-        The starttime of the recording. If `None`, `00.00.00` is used. If `starttime`
-        contains microseconds, an EDF+C file is created.
-    data_record_duration : float | None, default: None
-        The duration of each data record in seconds. If `None`, an appropriate value is
-        chosen automatically.
-    annotations : Iterable[EdfAnnotation] | None, default: None
-        The annotations, consisting of onset, duration (optional), and text. If not
-        `None`, an EDF+C file is created.
-    fmt : str, default "edf"
-        Can be "edf" or "bdf" to handle EDF or BDF data, respectively.
-    """
-
+class _Base:
     _header_fields = (
         ("version", 8),
         ("local_patient_identification", 80),
@@ -106,7 +67,6 @@ class Edf:
         starttime: datetime.time | None = None,
         data_record_duration: float | None = None,
         annotations: Iterable[EdfAnnotation] | None = None,
-        fmt: Literal["edf", "bdf"] = "edf",
     ):
         if not signals and not annotations:
             raise ValueError("Edf must contain either signals or annotations")
@@ -133,7 +93,6 @@ class Edf:
         self._set_reserved("")
         if starttime.microsecond and annotations is None:
             warnings.warn("Creating EDF+C to store microsecond starttime.")
-        self._fmt = fmt
         if annotations is not None or starttime.microsecond:
             signals = (
                 *signals,
@@ -272,22 +231,16 @@ class Edf:
         )
 
     @property
-    def signals(self) -> tuple[EdfSignal, ...]:
-        """
-        Ordinary signals contained in the recording.
-
-        Annotation signals are excluded. Individual signals can not be removed, added,
-        or replaced by modifying this property. Use :meth:`Edf.append_signals`,
-        :meth:`Edf.drop_signals`, or :attr:`EdfSignal.data`, respectively.
-        """
+    def signals(self) -> tuple[EdfSignal | BdfSignal, ...]:
         return tuple(s for s in self._signals if s.label != "EDF Annotations")
 
-    def _set_signals(self, signals: Sequence[EdfSignal]) -> None:
+    def _set_signals(self, signals: Sequence[EdfSignal | BdfSignal]) -> None:
         signals = tuple(signals)
         for si, signal in enumerate(signals):
             if signal._fmt != self._fmt:
                 raise ValueError(
-                    f"Signal {si} ({signal}) has format {signal._fmt}, but EDF is {self._fmt}"
+                    f"Signal {si} ({signal}) has format {signal._fmt}, but "
+                    f"{self.__class__.__name__} is {self._fmt}"
                 )
         self._set_num_data_records_with_signals(signals)
         self._signals = signals
@@ -1097,6 +1050,82 @@ class Edf:
             subsecond_offset=self._subsecond_offset + start - int(start),
             fmt=self._fmt,
         )
+
+
+class Edf(_Base):
+    """Python representation of an EDF file.
+
+    EDF header fields are exposed as properties with appropriate data types (i.e.,
+    string, numeric, date, or time objects). Fields that might break the file on
+    modification (i.e., `version`, `bytes_in_header_record`, `reserved`,
+    `num_data_records`, `data_record_duration`, and `num_signals`) can not be set after
+    instantiation.
+
+    Note that the startdate has to be set via the parameter `recording`.
+
+    For writing an EDF file with a non-integer seconds duration, currently an
+    appropriate value for `data_record_duration` has to be provided manually.
+
+    Parameters
+    ----------
+    signals : Sequence[EdfSignal]
+        The (non-annotation) signals to be contained in the EDF file.
+    patient : Patient | None, default: None
+        The "local patient identification", containing patient code, sex, birthdate,
+        name, and optional additional fields. If `None`, the field is set to `X X X X`
+        in accordance with EDF+ specs.
+    recording : Recording | None, default: None
+        The "local recording identification", containing recording startdate, hospital
+        administration code, investigator/technical code, equipment code, and optional
+        additional fields. If `None`, the field is set to `Startdate X X X X` in
+        accordance with EDF+ specs.
+    starttime : datetime.time | None, default: None
+        The starttime of the recording. If `None`, `00.00.00` is used. If `starttime`
+        contains microseconds, an EDF+C file is created.
+    data_record_duration : float | None, default: None
+        The duration of each data record in seconds. If `None`, an appropriate value is
+        chosen automatically.
+    annotations : Iterable[EdfAnnotation] | None, default: None
+        The annotations, consisting of onset, duration (optional), and text. If not
+        `None`, an EDF+C file is created.
+    """
+
+    _fmt = "edf"
+
+    @property
+    def signals(self) -> tuple[EdfSignal , ...]:
+        """
+        Ordinary signals contained in the recording.
+
+        Annotation signals are excluded. Individual signals can not be removed, added,
+        or replaced by modifying this property. Use :meth:`Edf.append_signals`,
+        :meth:`Edf.drop_signals`, or :attr:`EdfSignal.data`, respectively.
+        """
+        return super().signals
+
+
+class Bdf(_Base):
+    """Python representation of a BDF file.
+
+    See :class:`Edf` for information on the header fields and their types.
+
+    .. note::
+        BDF uses 24-bit integers (compared to 16-bit for EDF) for the digital values.
+        The default for ``digital_range`` (and the supported depth) thus differs.
+    """
+
+    _fmt = "bdf"
+
+    @property
+    def signals(self) -> tuple[BdfSignal , ...]:
+        """
+        Ordinary signals contained in the recording.
+
+        Annotation signals are excluded. Individual signals can not be removed, added,
+        or replaced by modifying this property. Use :meth:`Edf.append_signals`,
+        :meth:`Edf.drop_signals`, or :attr:`EdfSignal.data`, respectively.
+        """
+        return super().signals
 
 
 def _calculate_num_data_records(

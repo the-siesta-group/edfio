@@ -52,43 +52,7 @@ def _calculate_gain_and_offset(
     return gain, offset
 
 
-class EdfSignal:
-    """A single EDF signal.
-
-    Attributes that might break the signal or file on modification (i.e.,
-    `sampling_frequency`, `physical_range`, `digital_range`, `samples_per_data_record`,
-    and `reserved`) can not be set after instantiation.
-
-    To reduce memory consumption, signal data is always stored as a 16-bit integer array
-    containing the digital values that would be written to the corresponding EDF file.
-    Therefore, it is expected that `EdfSignal.data` does not match the physical
-    values passed during instantiation exactly.
-
-    Parameters
-    ----------
-    data : npt.NDArray[np.float64]
-        The signal data (physical values).
-    sampling_frequency : float
-        The sampling frequency in Hz.
-    label : str, default: `""`
-        The signal's label, e.g., `"EEG Fpz-Cz"` or `"Body temp"`.
-    transducer_type : str, default: `""`
-        The transducer type, e.g., `"AgAgCl electrode"`.
-    physical_dimension : str, default: `""`
-        The physical dimension, e.g., `"uV"` or `"degreeC"`
-    physical_range : tuple[float, float] | None, default: None
-        The physical range given as a tuple of `(physical_min, physical_max)`. If
-        `None`, this is determined from the data.
-    digital_range : tuple[int, int] | None, default: None
-        The digital range given as a tuple of `(digital_min, digital_max)`. Uses the
-        maximum resolution of 16-bit integers when fmt is "edf" and for 24-bit
-         integers when fmt is "bdf" by default.
-    prefiltering : str, default: `""`
-        The signal prefiltering, e.g., `"HP:0.1Hz LP:75Hz"`.
-    fmt : str, default `"edf"`
-        The data format. Can be `"edf"` or `"bdf"`.
-    """
-
+class _BaseSignal:
     _header_fields = (
         ("label", 16),
         ("transducer_type", 80),
@@ -116,16 +80,17 @@ class EdfSignal:
         physical_range: tuple[float, float] | None = None,
         digital_range: tuple[int, int] | None = None,
         prefiltering: str = "",
-        fmt: Literal["edf", "bdf"] = "edf",
     ):
         self._sampling_frequency = sampling_frequency
         self.label = label
         self.transducer_type = transducer_type
         self.physical_dimension = physical_dimension
         self.prefiltering = prefiltering
-        self._fmt = fmt
         if digital_range is None:
-            digital_range = (-8388608, 8388607) if fmt == "bdf" else (-32768, 32767)
+            if self._fmt == "bdf":
+                digital_range = (-8388608, 8388607)
+            else:
+                digital_range = (-32768, 32767)
         self._set_reserved("")
         if not np.all(np.isfinite(data)):
             raise ValueError("Signal data must contain only finite values")
@@ -312,11 +277,6 @@ class EdfSignal:
 
     @property
     def digital(self) -> npt.NDArray[np.int16 | np.int32]:
-        """
-        Numpy array containing the digital (uncalibrated) signal values as 16-bit integers.
-
-        The values of the array may be accessed and modified directly.
-        """
         if self._digital is None:
             if self._lazy_loader is None:
                 raise ValueError("Signal data not set")
@@ -363,18 +323,6 @@ class EdfSignal:
     def get_digital_slice(
         self, start_second: float, stop_second: float
     ) -> npt.NDArray[np.int16 | np.int32]:
-        """
-        Get a slice of the digital signal values.
-
-        If the signal has not been loaded into memory so far, only the requested slice will be read.
-
-        Parameters
-        ----------
-        start_second : float
-            The start of the slice in seconds.
-        stop_second : float
-            The end of the slice in seconds.
-        """
         duration = stop_second - start_second
         if duration < 0:
             raise ValueError("Invalid slice: Duration must be non-negative")
@@ -511,3 +459,104 @@ class EdfSignal:
         )
         dtype = np.int32 if self._fmt == "bdf" else np.int16
         self._digital = np.round(data / gain - offset).astype(dtype)
+
+
+class EdfSignal(_BaseSignal):
+    """A single EDF signal.
+
+    Attributes that might break the signal or file on modification (i.e.,
+    `sampling_frequency`, `physical_range`, `digital_range`, `samples_per_data_record`,
+    and `reserved`) can not be set after instantiation.
+
+    To reduce memory consumption, signal data is always stored as a 16-bit integer array
+    containing the digital values that would be written to the corresponding EDF file.
+    Therefore, it is expected that `EdfSignal.data` does not match the physical
+    values passed during instantiation exactly.
+
+    Parameters
+    ----------
+    data : npt.NDArray[np.float64]
+        The signal data (physical values).
+    sampling_frequency : float
+        The sampling frequency in Hz.
+    label : str, default: `""`
+        The signal's label, e.g., `"EEG Fpz-Cz"` or `"Body temp"`.
+    transducer_type : str, default: `""`
+        The transducer type, e.g., `"AgAgCl electrode"`.
+    physical_dimension : str, default: `""`
+        The physical dimension, e.g., `"uV"` or `"degreeC"`
+    physical_range : tuple[float, float] | None, default: None
+        The physical range given as a tuple of `(physical_min, physical_max)`. If
+        `None`, this is determined from the data.
+    digital_range : tuple[int, int] | None, default: None
+        The digital range given as a tuple of `(digital_min, digital_max)`. Uses the
+        maximum resolution of 16-bit integers.
+    prefiltering : str, default: `""`
+        The signal prefiltering, e.g., `"HP:0.1Hz LP:75Hz"`.
+    fmt : str, default `"edf"`
+        The data format. Can be `"edf"` or `"bdf"`.
+    """
+    _fmt = "edf"
+
+    @property
+    def digital(self) -> npt.NDArray[np.int16]:
+        """
+        Numpy array containing the digital (uncalibrated) signal values as 16-bit integers.
+
+        The values of the array may be accessed and modified directly.
+        """
+        return super().digital
+
+    def get_digital_slice(
+        self, start_second: float, stop_second: float
+    ) -> npt.NDArray[np.int16]:
+        """
+        Get a slice of the digital signal values.
+
+        If the signal has not been loaded into memory so far, only the requested slice will be read.
+
+        Parameters
+        ----------
+        start_second : float
+            The start of the slice in seconds.
+        stop_second : float
+            The end of the slice in seconds.
+        """
+        return super().get_digital_slice(start_second, stop_second)
+
+
+class BdfSignal(_BaseSignal):
+    """A single BDF signal.
+
+    See :class:`EdfSignal` for details on the parameters and attributes.
+
+    .. note::
+        BDF uses 24-bit integers (compared to 16-bit for EDF) for the digital values.
+        The default for ``digital_range`` (and the supported depth) thus differs.
+    """
+    _fmt = "bdf"
+
+    @property
+    def digital(self) -> npt.NDArray[np.int32]:
+        """
+        Numpy array containing the digital (uncalibrated) signal values as 32-bit integers.
+
+        The values of the array may be accessed and modified directly.
+        """
+
+    def get_digital_slice(
+        self, start_second: float, stop_second: float
+    ) -> npt.NDArray[np.int32]:
+        """
+        Get a slice of the digital signal values.
+
+        If the signal has not been loaded into memory so far, only the requested slice will be read.
+
+        Parameters
+        ----------
+        start_second : float
+            The start of the slice in seconds.
+        stop_second : float
+            The end of the slice in seconds.
+        """
+        return super().get_digital_slice(start_second, stop_second)
