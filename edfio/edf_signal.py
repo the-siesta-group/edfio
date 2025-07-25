@@ -78,7 +78,7 @@ class _BaseSignal:
         transducer_type: str = "",
         physical_dimension: str = "",
         physical_range: tuple[float, float] | None = None,
-        digital_range: tuple[int, int] | None = None,
+        digital_range: tuple[int, int] = (-32768, 32767),
         prefiltering: str = "",
     ):
         self._sampling_frequency = sampling_frequency
@@ -86,11 +86,6 @@ class _BaseSignal:
         self.transducer_type = transducer_type
         self.physical_dimension = physical_dimension
         self.prefiltering = prefiltering
-        if digital_range is None:
-            if self._fmt == "bdf":
-                digital_range = (-8388608, 8388607)
-            else:
-                digital_range = (-32768, 32767)
         self._set_reserved("")
         if not np.all(np.isfinite(data)):
             raise ValueError("Signal data must contain only finite values")
@@ -485,7 +480,7 @@ class EdfSignal(_BaseSignal):
         The transducer type, e.g., `"AgAgCl electrode"`.
     physical_dimension : str, default: `""`
         The physical dimension, e.g., `"uV"` or `"degreeC"`
-    physical_range : tuple[float, float] | None, default: None
+    physical_range : tuple[float, float], default: (-32768, 32767)
         The physical range given as a tuple of `(physical_min, physical_max)`. If
         `None`, this is determined from the data.
     digital_range : tuple[int, int] | None, default: None
@@ -497,6 +492,29 @@ class EdfSignal(_BaseSignal):
         The data format. Can be `"edf"` or `"bdf"`.
     """
     _fmt = "edf"
+
+    def __init__(
+        self,
+        data: npt.NDArray[np.float64],
+        sampling_frequency: float,
+        *,
+        label: str = "",
+        transducer_type: str = "",
+        physical_dimension: str = "",
+        physical_range: tuple[float, float] | None = None,
+        digital_range: tuple[int, int] = (-32768, 32767),
+        prefiltering: str = "",
+    ):
+        super().__init__(
+            data=data,
+            sampling_frequency=sampling_frequency,
+            label=label,
+            transducer_type=transducer_type,
+            physical_dimension=physical_dimension,
+            physical_range=physical_range,
+            digital_range=digital_range,
+            prefiltering=prefiltering,
+        )
 
     @property
     def digital(self) -> npt.NDArray[np.int16]:
@@ -535,6 +553,29 @@ class BdfSignal(_BaseSignal):
         The default for ``digital_range`` (and the supported depth) thus differs.
     """
     _fmt = "bdf"
+
+    def __init__(
+        self,
+        data: npt.NDArray[np.float64],
+        sampling_frequency: float,
+        *,
+        label: str = "",
+        transducer_type: str = "",
+        physical_dimension: str = "",
+        physical_range: tuple[float, float] | None = None,
+        digital_range: tuple[int, int] = (-8388608, 8388607),
+        prefiltering: str = "",
+    ):
+        super().__init__(
+            data=data,
+            sampling_frequency=sampling_frequency,
+            label=label,
+            transducer_type=transducer_type,
+            physical_dimension=physical_dimension,
+            physical_range=physical_range,
+            digital_range=digital_range,
+            prefiltering=prefiltering,
+        )
 
     @property
     def digital(self) -> npt.NDArray[np.int32]:

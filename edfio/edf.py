@@ -1122,8 +1122,8 @@ class Bdf(_Base):
         Ordinary signals contained in the recording.
 
         Annotation signals are excluded. Individual signals can not be removed, added,
-        or replaced by modifying this property. Use :meth:`Edf.append_signals`,
-        :meth:`Edf.drop_signals`, or :attr:`EdfSignal.data`, respectively.
+        or replaced by modifying this property. Use :meth:`Bdf.append_signals`,
+        :meth:`Bdf.drop_signals`, or :attr:`BdfSignal.data`, respectively.
         """
         return super().signals
 
