@@ -17,6 +17,10 @@ from edfio._header_field import (
 from edfio._lazy_loading import LazyLoader
 
 
+_EDF_DEFAULT_RANGE = (-32768, 32767)
+_BDF_DEFAULT_RANGE = (-8388608, 8388607)
+
+
 class _IntRange(NamedTuple):
     min: int
     max: int
@@ -78,7 +82,7 @@ class _BaseSignal:
         transducer_type: str = "",
         physical_dimension: str = "",
         physical_range: tuple[float, float] | None = None,
-        digital_range: tuple[int, int] = (-32768, 32767),
+        digital_range: tuple[int, int] = _EDF_DEFAULT_RANGE,
         prefiltering: str = "",
     ):
         self._sampling_frequency = sampling_frequency
@@ -502,7 +506,7 @@ class EdfSignal(_BaseSignal):
         transducer_type: str = "",
         physical_dimension: str = "",
         physical_range: tuple[float, float] | None = None,
-        digital_range: tuple[int, int] = (-32768, 32767),
+        digital_range: tuple[int, int] = _EDF_DEFAULT_RANGE,
         prefiltering: str = "",
     ):
         super().__init__(
@@ -563,7 +567,7 @@ class BdfSignal(_BaseSignal):
         transducer_type: str = "",
         physical_dimension: str = "",
         physical_range: tuple[float, float] | None = None,
-        digital_range: tuple[int, int] = (-8388608, 8388607),
+        digital_range: tuple[int, int] = _BDF_DEFAULT_RANGE,
         prefiltering: str = "",
     ):
         super().__init__(

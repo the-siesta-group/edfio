@@ -7,7 +7,7 @@ from typing import Any, NamedTuple
 
 import numpy as np
 
-from edfio.edf_signal import BdfSignal, EdfSignal
+from edfio.edf_signal import BdfSignal, EdfSignal, _EDF_DEFAULT_RANGE, _BDF_DEFAULT_RANGE
 
 _ANNOTATIONS_PATTERN = re.compile(
     """
@@ -104,10 +104,10 @@ def _create_annotations_signal(
     divisor = data_record_duration if data_record_duration else 1
     if fmt == "edf":
         klass = EdfSignal
-        physical_range = (-32768, 32767)
+        physical_range = _EDF_DEFAULT_RANGE
     else:
         klass = BdfSignal
-        physical_range = (-8388608, 8388607)
+        physical_range = _BDF_DEFAULT_RANGE
     signal = klass(
         np.arange(1.0),  # placeholder signal, as argument `data` is non-optional
         sampling_frequency=maxlen // 2 / divisor,
