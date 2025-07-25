@@ -10,7 +10,7 @@ authors = [
     { name = "The Siesta Group", email = "opensource@thesiestagroup.com" }
 ]
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.9"
 dependencies = [
     "numpy >= 1.22.0"
 ]

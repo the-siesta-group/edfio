@@ -27,7 +27,7 @@ jobs:
           enable-cache: true
           cache-dependency-glob: "**/pyproject.toml"
       - name: Pre-commit
-        run: uv run --python=3.10 --with numpy==1.22.0 pre-commit run --all-files
+        run: uv run --python=3.9 --with numpy==1.22.0 pre-commit run --all-files
 
   test:
     needs: pre-commit
