@@ -10,7 +10,6 @@ API reference
    read_edf
    Bdf
    BdfSignal
-   BdfAnnotation
    Edf
    EdfSignal
    EdfAnnotation
