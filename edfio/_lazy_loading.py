@@ -33,7 +33,7 @@ class LazyLoader:
 
     def load(
         self, start_record: Optional[int] = None, end_record: Optional[int] = None
-    ) -> NDArray[np.int16 | np.int32]:
+    ) -> NDArray[Union[np.int16, np.int32]]:
         """
         Load signal data from the buffer.
 

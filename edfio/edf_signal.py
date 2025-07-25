@@ -275,6 +275,13 @@ class _BaseSignal:
 
     @property
     def digital(self) -> npt.NDArray[np.int16 | np.int32]:
+        """
+        Numpy array containing the digital (uncalibrated) signal values as integers.
+
+        The values of the array may be accessed and modified directly.
+
+        For EDF these are 16-bit integers, for BDF these are 32-bit integers.
+        """
         if self._digital is None:
             if self._lazy_loader is None:
                 raise ValueError("Signal data not set")
@@ -323,6 +330,18 @@ class _BaseSignal:
     def get_digital_slice(
         self, start_second: float, stop_second: float
     ) -> npt.NDArray[np.int16 | np.int32]:
+        """
+        Get a slice of the digital signal values.
+
+        If the signal has not been loaded into memory so far, only the requested slice will be read.
+
+        Parameters
+        ----------
+        start_second : float
+            The start of the slice in seconds.
+        stop_second : float
+            The end of the slice in seconds.
+        """
         duration = stop_second - start_second
         if duration < 0:
             raise ValueError("Invalid slice: Duration must be non-negative")
@@ -522,32 +541,6 @@ class EdfSignal(_BaseSignal):
             prefiltering=prefiltering,
         )
 
-    @property
-    def digital(self) -> npt.NDArray[np.int16]:
-        """
-        Numpy array containing the digital (uncalibrated) signal values as 16-bit integers.
-
-        The values of the array may be accessed and modified directly.
-        """
-        return super().digital
-
-    def get_digital_slice(
-        self, start_second: float, stop_second: float
-    ) -> npt.NDArray[np.int16]:
-        """
-        Get a slice of the digital signal values.
-
-        If the signal has not been loaded into memory so far, only the requested slice will be read.
-
-        Parameters
-        ----------
-        start_second : float
-            The start of the slice in seconds.
-        stop_second : float
-            The end of the slice in seconds.
-        """
-        return super().get_digital_slice(start_second, stop_second)
-
 
 class BdfSignal(_BaseSignal):
     """A single BDF signal.
@@ -583,29 +576,3 @@ class BdfSignal(_BaseSignal):
             digital_range=digital_range,
             prefiltering=prefiltering,
         )
-
-    @property
-    def digital(self) -> npt.NDArray[np.int32]:
-        """
-        Numpy array containing the digital (uncalibrated) signal values as 32-bit integers.
-
-        The values of the array may be accessed and modified directly.
-        """
-        return super().digital
-
-    def get_digital_slice(
-        self, start_second: float, stop_second: float
-    ) -> npt.NDArray[np.int32]:
-        """
-        Get a slice of the digital signal values.
-
-        If the signal has not been loaded into memory so far, only the requested slice will be read.
-
-        Parameters
-        ----------
-        start_second : float
-            The start of the slice in seconds.
-        stop_second : float
-            The end of the slice in seconds.
-        """
-        return super().get_digital_slice(start_second, stop_second)

@@ -241,9 +241,9 @@ class _Base:
 
         for signal, start, end in zip(self._signals, starts, ends):
             if lazy_load_data:
-                signal._lazy_loader = LazyLoader(datarecords, start, end)
+                signal._lazy_loader = LazyLoader(datarecords, start, end)  # type: ignore[arg-type,unused-ignore]
             else:
-                signal._digital = datarecords[:, start:end].flatten()
+                signal._digital = datarecords[:, start:end].flatten()  # type: ignore[assignment,unused-ignore]
 
     def _read_header(
         self,
