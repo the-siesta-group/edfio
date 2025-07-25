@@ -29,7 +29,8 @@ def pytest_configure(config):
 
 @pytest.fixture
 def tmp_file(tmp_path: Path, request: pytest.FixtureRequest) -> Path:
-    if request.node.get_closest_marker("bdf_format") is not None:
+    bdf_mark = request.node.get_closest_marker("bdf_format")
+    if bdf_mark is not None and bdf_mark.name == "bdf_format":
         ext = "bdf"
     else:
         ext = "edf"
@@ -53,10 +54,10 @@ def buffered_lazy_loader() -> LazyLoader:
     return LazyLoader(data_records, 3, 6)
 
 
-@pytest.fixture(params=["edf", "bdf"], scope="session")
+@pytest.fixture(params=["edf", "bdf"])
 def klasses(request) -> tuple[type, type]:
     """Parametrizes the name of the browser backend."""
-    request.applymarker(f"{request.param}_format")
+    request.node.add_marker(f"{request.param}_format")
     if request.param == "edf":
         return Edf, EdfSignal, request.param
     else:  # noqa: RET505

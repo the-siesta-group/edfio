@@ -1234,7 +1234,7 @@ def test_create_edf_with_many_annotations():
     assert edf is not None
 
 
-def test_read_edf_with_latin_1_encoded_header_fields(tmp_file: Path, klasses):
+def test_read_edf_with_latin_1_encoded_header_fields(klasses, tmp_file: Path):
     Edf, EdfSignal, _ = klasses
     signal = EdfSignal(np.arange(10), 1)
     signal._label = "Posição".encode("latin-1").ljust(16)
