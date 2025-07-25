@@ -277,7 +277,7 @@ class _Base:
         for si, signal in enumerate(signals):
             if signal._fmt != self._fmt:
                 raise ValueError(
-                    f"Signal {si} ({signal}) has format {signal._fmt}, but "
+                    f"Signal {si} ({signal}) has format {signal._fmt_pretty}, but "
                     f"{self.__class__.__name__} is {self._fmt_pretty}"
                 )
         self._set_num_data_records_with_signals(signals)

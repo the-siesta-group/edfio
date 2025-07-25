@@ -4,8 +4,8 @@ import datetime
 import io
 import json
 import tempfile
+from contextlib import nullcontext
 from pathlib import Path
-from shutil import copyfile
 from typing import Literal
 
 import numpy as np
@@ -13,6 +13,8 @@ import pytest
 
 from edfio import (
     AnonymizedDateError,
+    Bdf,
+    BdfSignal,
     Edf,
     EdfAnnotation,
     EdfSignal,
@@ -1168,30 +1170,34 @@ def test_sampling_frequencies_leading_to_floating_point_issues_in_signal_duratio
     ("extra_bytes", "num_records_in_header", "expected_warning"),
     [
     #    extra bytes     num records field    expected warning
-        (1,              10,                  "Incomplete data record at the end of the EDF file"),
-        (15,             10,                  "Incomplete data record at the end of the EDF file"),
+        (0,              10,                  None),
+        (1,              10,                  "Incomplete data record at the end of the [BE]DF file"),
+        (13,             10,                  "Incomplete data record at the end of the [BE]DF file"),
         (0,              9,                   "EDF header indicates 9 data records, but file contains 10 records. Updating header."),
         (0,              11,                  "EDF header indicates 11 data records, but file contains 10 records. Updating header."),
         (0,              -1,                  "EDF header indicates -1 data records, but file contains 10 records. Updating header."),
     ],
 )
 def test_read_edf_with_invalid_number_of_records(
-    tmp_path: Path,
+    tmp_file: Path,
     extra_bytes: int,
     num_records_in_header: int,
     expected_warning: str,
 ):
-    invalid_edf = tmp_path / "invalid.edf"
-    copyfile(EDF_FILE, invalid_edf)
-    with invalid_edf.open("rb+") as file:
+    read_edf(EDF_FILE).write(tmp_file)
+    with tmp_file.open("rb+") as file:
         file.seek(236)
         file.write(f"{num_records_in_header: <8}".encode("ascii"))
         if extra_bytes > 0:
             file.seek(0, 2)
             file.write(b"\0" * extra_bytes)
 
-    for io_obj in (invalid_edf, invalid_edf.read_bytes()):
-        with pytest.warns(UserWarning, match=expected_warning):
+    for io_obj in (tmp_file, tmp_file.read_bytes()):
+        if expected_warning is None:
+            ctx = nullcontext()
+        else:
+            ctx = pytest.warns(UserWarning, match=expected_warning)
+        with ctx:
             edf = read_edf(io_obj)
         assert edf.num_data_records == 10
         comparison_edf = read_edf(EDF_FILE)
@@ -1232,6 +1238,18 @@ def test_create_edf_with_many_annotations():
     annotations = [EdfAnnotation(second + 0.5, None, "A") for second in range(duration)]
     edf = Edf(signals, annotations=annotations)
     assert edf is not None
+
+
+@pytest.mark.parametrize("edf_klass", [Edf, Bdf])
+@pytest.mark.parametrize("signal_klass", [EdfSignal, BdfSignal])
+def test_edf_bdf_cross_error(edf_klass, signal_klass):
+    signal = signal_klass(np.arange(10), 1)
+    if edf_klass._fmt == signal._fmt:
+        ctx = nullcontext()
+    else:
+        ctx = pytest.raises(ValueError, match="Signal 0 .* has format .* but .*")
+    with ctx:
+        edf_klass([signal])
 
 
 def test_read_edf_with_latin_1_encoded_header_fields(klasses, tmp_file: Path):

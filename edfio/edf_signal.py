@@ -101,7 +101,11 @@ class _BaseSignal:
         info = f"{self.sampling_frequency:g}Hz"
         if self.label:
             info = f"{self.label} " + info
-        return f"<EdfSignal {info}>"
+        return f"<{self.__class__.__name__} {info}>"
+
+    @property
+    def _fmt_pretty(self) -> str:
+        return self._fmt.upper()
 
     @classmethod
     def _from_raw_header(
@@ -512,8 +516,6 @@ class EdfSignal(_BaseSignal):
         maximum resolution of 16-bit integers.
     prefiltering : str, default: `""`
         The signal prefiltering, e.g., `"HP:0.1Hz LP:75Hz"`.
-    fmt : str, default `"edf"`
-        The data format. Can be `"edf"` or `"bdf"`.
     """
 
     _fmt = "edf"
