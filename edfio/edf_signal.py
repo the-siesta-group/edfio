@@ -16,7 +16,6 @@ from edfio._header_field import (
 )
 from edfio._lazy_loading import LazyLoader
 
-
 _EDF_DEFAULT_RANGE = (-32768, 32767)
 _BDF_DEFAULT_RANGE = (-8388608, 8388607)
 
@@ -69,7 +68,7 @@ class _BaseSignal:
         ("samples_per_data_record", 8),
         ("reserved", 32),
     )
-
+    _fmt: Literal["edf", "bdf"] = "edf"
     _digital: npt.NDArray[np.int16 | np.int32] | None = None
     _lazy_loader: LazyLoader | None = None
 
@@ -120,7 +119,7 @@ class _BaseSignal:
         samples_per_data_record: bytes,
         reserved: bytes,
         header_encoding: str = "ascii",
-    ) -> EdfSignal:
+    ) -> EdfSignal | BdfSignal:
         sig = object.__new__(cls)
         sig._sampling_frequency = sampling_frequency
         sig._label = label
@@ -134,7 +133,7 @@ class _BaseSignal:
         sig._samples_per_data_record = samples_per_data_record
         sig._reserved = reserved
         sig._header_encoding = header_encoding
-        return sig
+        return sig  # type: ignore[return-value]
 
     @classmethod
     def from_hypnogram(
@@ -283,7 +282,9 @@ class _BaseSignal:
             self._lazy_loader = None
         return self._digital
 
-    def _calibrate(self, digital: npt.NDArray[np.int16 | np.int32]) -> npt.NDArray[np.float64]:
+    def _calibrate(
+        self, digital: npt.NDArray[np.int16 | np.int32]
+    ) -> npt.NDArray[np.float64]:
         try:
             gain, offset = _calculate_gain_and_offset(
                 self.digital_min,
@@ -495,6 +496,7 @@ class EdfSignal(_BaseSignal):
     fmt : str, default `"edf"`
         The data format. Can be `"edf"` or `"bdf"`.
     """
+
     _fmt = "edf"
 
     def __init__(
@@ -556,6 +558,7 @@ class BdfSignal(_BaseSignal):
         BDF uses 24-bit integers (compared to 16-bit for EDF) for the digital values.
         The default for ``digital_range`` (and the supported depth) thus differs.
     """
+
     _fmt = "bdf"
 
     def __init__(

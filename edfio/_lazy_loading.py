@@ -20,7 +20,10 @@ class LazyLoader:
 
     def __init__(
         self,
-        buffer: Union[NDArray[np.int16 | np.int32], np.memmap[Any, np.dtype[np.int16 | np.int32]]],
+        buffer: Union[
+            NDArray[Union[np.int16, np.int32]],
+            np.memmap[Any, np.dtype[Union[np.int16, np.int32]]],
+        ],
         start_sample: int,
         end_sample: int,
     ) -> None:

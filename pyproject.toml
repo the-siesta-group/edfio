@@ -10,7 +10,7 @@ authors = [
     { name = "The Siesta Group", email = "opensource@thesiestagroup.com" }
 ]
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 dependencies = [
     "numpy >= 1.22.0"
 ]
@@ -90,7 +90,7 @@ ignore = ["E501", "E741", "B028", "D100", "D104", "D105", "PLR0913"]
 fixable = ["I001"]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/*" = ["S101", "PLR2004", "B018", "D"]
+"tests/*" = ["S101", "PLR2004", "B018", "D", "N806"]
 
 [tool.ruff.lint.flake8-tidy-imports]
 ban-relative-imports = "all"

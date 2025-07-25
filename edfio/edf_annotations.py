@@ -3,11 +3,16 @@ from __future__ import annotations
 import re
 from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Any, NamedTuple
+from typing import Any, Literal, NamedTuple
 
 import numpy as np
 
-from edfio.edf_signal import BdfSignal, EdfSignal, _EDF_DEFAULT_RANGE, _BDF_DEFAULT_RANGE
+from edfio.edf_signal import (
+    _BDF_DEFAULT_RANGE,
+    _EDF_DEFAULT_RANGE,
+    BdfSignal,
+    EdfSignal,
+)
 
 _ANNOTATIONS_PATTERN = re.compile(
     """
@@ -75,7 +80,7 @@ def _create_annotations_signal(
     with_timestamps: bool = True,
     subsecond_offset: float = 0,
     fmt: Literal["edf", "bdf"] = "edf",
-) -> EdfSignal:
+) -> EdfSignal | BdfSignal:
     data_record_starts = np.arange(num_data_records) * data_record_duration
     # list.pop() is O(1) and list.pop(0) is O(n), so using a reversed list is faster
     annotations = sorted(annotations, reverse=True)
@@ -102,6 +107,7 @@ def _create_annotations_signal(
         maxlen += 1
     raw = b"".join(dr.ljust(maxlen, b"\x00") for dr in data_records)
     divisor = data_record_duration if data_record_duration else 1
+    klass: type[EdfSignal | BdfSignal]
     if fmt == "edf":
         klass = EdfSignal
         physical_range = _EDF_DEFAULT_RANGE

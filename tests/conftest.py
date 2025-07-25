@@ -1,10 +1,9 @@
 from pathlib import Path
-from typing import Tuple, Type
 
 import numpy as np
 import pytest
 
-from edfio import Edf, Bdf, EdfSignal, BdfSignal
+from edfio import Bdf, BdfSignal, Edf, EdfSignal
 from edfio._lazy_loading import LazyLoader
 
 
@@ -22,8 +21,8 @@ def pytest_configure(config):
     warning_lines += r"""
     error::
     """
-    for warning_line in warning_lines.split("\n"):
-        warning_line = warning_line.strip()
+    for line in warning_lines.split("\n"):
+        warning_line = line.strip()
         if warning_line and not warning_line.startswith("#"):
             config.addinivalue_line("filterwarnings", warning_line)
 
@@ -55,11 +54,11 @@ def buffered_lazy_loader() -> LazyLoader:
 
 
 @pytest.fixture(params=["edf", "bdf"], scope="session")
-def klasses(request) -> Tuple[Type, Type]:
+def klasses(request) -> tuple[type, type]:
     """Parametrizes the name of the browser backend."""
     request.applymarker(f"{request.param}_format")
     if request.param == "edf":
         return Edf, EdfSignal, request.param
-    else:
+    else:  # noqa: RET505
         assert request.param == "bdf"
         return Bdf, BdfSignal, request.param
