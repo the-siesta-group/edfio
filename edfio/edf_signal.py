@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import math
+import sys
 import warnings
-from typing import Callable, Literal, NamedTuple
+from typing import Callable, ClassVar, Literal, NamedTuple
 
 import numpy as np
 import numpy.typing as npt
@@ -15,6 +16,10 @@ from edfio._header_field import (
     encode_str,
 )
 from edfio._lazy_loading import LazyLoader
+
+if sys.version_info < (3, 11):
+    from typing_extensions import Self
+
 
 _EDF_DEFAULT_RANGE = (-32768, 32767)
 _BDF_DEFAULT_RANGE = (-8388608, 8388607)
@@ -68,7 +73,8 @@ class _BaseSignal:
         ("samples_per_data_record", 8),
         ("reserved", 32),
     )
-    _fmt: Literal["edf", "bdf"] = "edf"
+    _digital_dtype: type[np.int16 | np.int32]
+    _fmt: ClassVar[Literal["EDF", "BDF"]]
     _digital: npt.NDArray[np.int16 | np.int32] | None = None
     _lazy_loader: LazyLoader | None = None
 
@@ -103,10 +109,6 @@ class _BaseSignal:
             info = f"{self.label} " + info
         return f"<{self.__class__.__name__} {info}>"
 
-    @property
-    def _fmt_pretty(self) -> str:
-        return self._fmt.upper()
-
     @classmethod
     def _from_raw_header(
         cls,
@@ -123,7 +125,7 @@ class _BaseSignal:
         samples_per_data_record: bytes,
         reserved: bytes,
         header_encoding: str = "ascii",
-    ) -> EdfSignal | BdfSignal:
+    ) -> Self:
         sig = object.__new__(cls)
         sig._sampling_frequency = sampling_frequency
         sig._label = label
@@ -137,7 +139,7 @@ class _BaseSignal:
         sig._samples_per_data_record = samples_per_data_record
         sig._reserved = reserved
         sig._header_encoding = header_encoding
-        return sig  # type: ignore[return-value]
+        return sig
 
     @classmethod
     def from_hypnogram(
@@ -146,7 +148,7 @@ class _BaseSignal:
         stage_duration: float = 30,
         *,
         label: str = "",
-    ) -> EdfSignal:
+    ) -> Self:
         """Create an EDF signal from a hypnogram, with scaling according to EDF specs.
 
         According to the EDF FAQ [1]_, use integer numbers 0, 1, 2, 3, 4, 5, 6, and 9
@@ -175,7 +177,7 @@ class _BaseSignal:
         allowed_stages = {0, 1, 2, 3, 4, 5, 6, 9}
         if invalid_stages := set(stages) - allowed_stages:
             raise ValueError(f"stages contains invalid values: {invalid_stages}")
-        return EdfSignal(
+        return cls(
             data=stages,
             sampling_frequency=1 / stage_duration,
             label=label,
@@ -480,8 +482,7 @@ class _BaseSignal:
             self.physical_min,
             self.physical_max,
         )
-        dtype = np.int32 if self._fmt == "bdf" else np.int16
-        self._digital = np.round(data / gain - offset).astype(dtype)
+        self._digital = np.round(data / gain - offset).astype(self._digital_dtype)
 
 
 class EdfSignal(_BaseSignal):
@@ -518,7 +519,8 @@ class EdfSignal(_BaseSignal):
         The signal prefiltering, e.g., `"HP:0.1Hz LP:75Hz"`.
     """
 
-    _fmt = "edf"
+    _digital_dtype = np.int16
+    _fmt = "EDF"
 
     def __init__(
         self,
@@ -554,7 +556,8 @@ class BdfSignal(_BaseSignal):
         The default for ``digital_range`` (and the supported depth) thus differs.
     """
 
-    _fmt = "bdf"
+    _digital_dtype = np.int32
+    _fmt = "BDF"
 
     def __init__(
         self,

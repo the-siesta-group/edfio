@@ -1,41 +1,25 @@
+import sys
 from pathlib import Path
+from typing import Literal
 
 import numpy as np
 import pytest
 
 from edfio import Bdf, BdfSignal, Edf, EdfSignal
 from edfio._lazy_loading import LazyLoader
+from edfio.edf import read_bdf, read_edf
+from edfio.edf_signal import _BDF_DEFAULT_RANGE, _EDF_DEFAULT_RANGE
 
 
-def pytest_configure(config):
-    """Configure pytest."""
-    # Set numpy print options for tests
-    for marker in (
-        "edf_format: mark a test as using an EDF formatting",
-        "bdf_format: mark a test as using an BDF formatting",
-    ):
-        config.addinivalue_line("markers", marker)
-
-    # Treat uncaught warnings as errors
-    warning_lines = "    error::"
-    warning_lines += r"""
-    error::
-    """
-    for line in warning_lines.split("\n"):
-        warning_line = line.strip()
-        if warning_line and not warning_line.startswith("#"):
-            config.addinivalue_line("filterwarnings", warning_line)
+class _Context:
+    format: Literal["edf", "bdf"] = "edf"
+    digital_range: tuple[int, int] = _EDF_DEFAULT_RANGE
+    bits: int = 16
 
 
 @pytest.fixture
 def tmp_file(tmp_path: Path, request: pytest.FixtureRequest) -> Path:
-    bdf_mark = request.node.get_closest_marker("bdf_format")
-    if bdf_mark is not None and bdf_mark.name == "bdf_format":
-        ext = "bdf"
-    else:
-        ext = "edf"
-
-    return tmp_path / f"target.{ext}"
+    return tmp_path / f"target.{_Context.format}"
 
 
 @pytest.fixture
@@ -54,12 +38,47 @@ def buffered_lazy_loader() -> LazyLoader:
     return LazyLoader(data_records, 3, 6)
 
 
-@pytest.fixture(params=["edf", "bdf"])
-def klasses(request) -> tuple[type, type]:
-    """Parametrizes the name of the browser backend."""
-    request.node.add_marker(f"{request.param}_format")
-    if request.param == "edf":
-        return Edf, EdfSignal, request.param
-    else:  # noqa: RET505
-        assert request.param == "bdf"
-        return Bdf, BdfSignal, request.param
+def pytest_collection_modifyitems(config, items):
+    keep = []
+    for item in items:
+        format = item.callspec.params["inject_classes"]
+        markers = {m.name for m in item.iter_markers()}
+        if markers & {"bdf", "edf"} and format not in markers:
+            continue
+        keep.append(item)
+    items[:] = keep
+
+
+@pytest.fixture(params=["edf", "bdf"], ids=["edf", "bdf"], autouse=True)
+def inject_classes(request):
+    formats = {
+        "edf": (Edf, EdfSignal, _EDF_DEFAULT_RANGE, 16, read_edf),
+        "bdf": (Bdf, BdfSignal, _BDF_DEFAULT_RANGE, 24, read_bdf),
+    }
+    format = request.param
+    file_class, signal_class, digital_range, bits, read_func = formats[format]
+    if (
+        format == "bdf"
+        and not request.node.get_closest_marker("bdf")
+        and any(
+            s in request.node.name
+            for s in ("annotation", "subsecond", "microsecond", "edfplus")
+        )
+    ):
+        pytest.xfail("Annotations not supported for BDF yet")
+    if not request.node.get_closest_marker(format):
+        for name, param in request.node.callspec.params.items():
+            if isinstance(param, (Edf, EdfSignal)):
+                raise ValueError(
+                    f"Test parameter {name!r} ({param}) breaks automatically extending the test to BDF. "
+                )
+    module = sys.modules[request.node.obj.__module__]
+    module.Edf = file_class
+    module.EdfSignal = signal_class
+    module.read_edf = read_func
+    _Context.digital_range = digital_range
+    _Context.bits = bits
+    _Context.format = format
+    for file_constant in ("EDF_FILE", "MNE_TEST_FILE", "SUBSECOND_TEST_FILE"):
+        if path := getattr(module, file_constant, None):
+            setattr(module, file_constant, path.with_suffix(f".{format}"))

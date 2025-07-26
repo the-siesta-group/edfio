@@ -181,11 +181,7 @@ def test_read_write_does_not_change_edfplus_with_annotations(tmp_file: Path):
     assert tmp_file.read_bytes() == source_path.read_bytes()
 
 
-def test_write_edf_with_annotations(klasses, tmp_file: Path):
-    Edf, EdfSignal, kind = klasses
-    # TODO: Need to fix this
-    if kind == "bdf":
-        pytest.xfail("Annotations not supported for BDF yet")
+def test_write_edf_with_annotations(tmp_file: Path):
     annotations = (EdfAnnotation(3.5, 3, text="huhu"), EdfAnnotation(5, 1, "仰卧"))
     Edf([EdfSignal(np.arange(10), 1)], annotations=annotations).write(tmp_file)
     edf = read_edf(tmp_file)

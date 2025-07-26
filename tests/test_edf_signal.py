@@ -7,13 +7,14 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from edfio import EdfSignal
+from edfio import BdfSignal, EdfSignal
 from edfio._lazy_loading import LazyLoader
 from edfio.edf_signal import (
     _FloatRange,
     _IntRange,
     _round_float_to_8_characters,
 )
+from tests.conftest import _Context
 
 
 # fmt: off
@@ -72,7 +73,7 @@ def dummy_edf_signal() -> EdfSignal:
 def test_edf_signal_init_minimal():
     data = sine(5, 2, 128)
     sig = EdfSignal(data, 128)
-    tolerance = np.ptp(data) * 2**-16
+    tolerance = np.ptp(data) * 2**-_Context.bits
     np.testing.assert_allclose(
         sig.data,
         data,
@@ -169,6 +170,7 @@ def test_edf_signal_samples_per_data_record_not_set(dummy_edf_signal: EdfSignal)
         dummy_edf_signal.samples_per_data_record
 
 
+@pytest.mark.edf
 @pytest.mark.parametrize(
     ("signal", "expected"),
     [
@@ -179,6 +181,20 @@ def test_edf_signal_samples_per_data_record_not_set(dummy_edf_signal: EdfSignal)
     ],
 )
 def test_edf_signal_repr(signal: EdfSignal, expected: str):
+    assert repr(signal) == expected
+
+
+@pytest.mark.bdf
+@pytest.mark.parametrize(
+    ("signal", "expected"),
+    [
+        (BdfSignal(np.arange(5), 1), "<BdfSignal 1Hz>"),
+        (BdfSignal(np.arange(5), 1, label="ECG"), "<BdfSignal ECG 1Hz>"),
+        (BdfSignal(np.arange(5), 256.0), "<BdfSignal 256Hz>"),
+        (BdfSignal(np.arange(5), 123.456), "<BdfSignal 123.456Hz>"),
+    ],
+)
+def test_bdf_signal_repr(signal: BdfSignal, expected: str):
     assert repr(signal) == expected
 
 
@@ -242,7 +258,7 @@ def test_edf_signal_update_data(data):
     signal = EdfSignal(np.array([-5, 5]), 1)
     signal.update_data(data)
     np.testing.assert_array_equal(signal.data, data)
-    np.testing.assert_array_equal(signal._digital, np.array([-32768, 32767]))
+    np.testing.assert_array_equal(signal._digital, _Context.digital_range)
     assert signal.physical_range == _FloatRange(data.min(), data.max())
 
 
@@ -352,6 +368,7 @@ def test_creating_edf_signal_with_constant_data_is_possible():
     np.testing.assert_array_equal(signal.data, np.zeros(5))
 
 
+@pytest.mark.edf
 def test_rounding_of_physical_range_does_not_produce_clipping_or_integer_overflow():
     data = np.array([0, 0.0000014999])
     sig = EdfSignal(data, 1)

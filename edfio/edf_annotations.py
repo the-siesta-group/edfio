@@ -3,16 +3,11 @@ from __future__ import annotations
 import re
 from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Any, Literal, NamedTuple
+from typing import Any, NamedTuple
 
 import numpy as np
 
-from edfio.edf_signal import (
-    _BDF_DEFAULT_RANGE,
-    _EDF_DEFAULT_RANGE,
-    BdfSignal,
-    EdfSignal,
-)
+from edfio.edf_signal import EdfSignal
 
 _ANNOTATIONS_PATTERN = re.compile(
     """
@@ -79,8 +74,7 @@ def _create_annotations_signal(
     data_record_duration: float,
     with_timestamps: bool = True,
     subsecond_offset: float = 0,
-    fmt: Literal["edf", "bdf"] = "edf",
-) -> EdfSignal | BdfSignal:
+) -> EdfSignal:
     data_record_starts = np.arange(num_data_records) * data_record_duration
     # list.pop() is O(1) and list.pop(0) is O(n), so using a reversed list is faster
     annotations = sorted(annotations, reverse=True)
@@ -107,17 +101,10 @@ def _create_annotations_signal(
         maxlen += 1
     raw = b"".join(dr.ljust(maxlen, b"\x00") for dr in data_records)
     divisor = data_record_duration if data_record_duration else 1
-    klass: type[EdfSignal | BdfSignal]
-    if fmt == "edf":
-        klass = EdfSignal
-        physical_range = _EDF_DEFAULT_RANGE
-    else:
-        klass = BdfSignal
-        physical_range = _BDF_DEFAULT_RANGE
-    signal = klass(
+    signal = EdfSignal(
         np.arange(1.0),  # placeholder signal, as argument `data` is non-optional
         sampling_frequency=maxlen // 2 / divisor,
-        physical_range=physical_range,
+        physical_range=(-32768, 32767),
     )
     signal._label = b"EDF Annotations "
     signal._set_samples_per_data_record(maxlen // 2)

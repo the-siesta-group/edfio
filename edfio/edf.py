@@ -10,10 +10,9 @@ import warnings
 from collections.abc import Iterable, Sequence
 from decimal import Decimal
 from fractions import Fraction
-from functools import singledispatch
 from math import ceil, floor
 from pathlib import Path
-from typing import Any, Literal
+from typing import ClassVar, Generic, Literal, TypeVar, Union
 
 import numpy as np
 
@@ -42,8 +41,10 @@ from edfio.edf_header import (
 )
 from edfio.edf_signal import BdfSignal, EdfSignal
 
+_Signal = TypeVar("_Signal", bound=Union[EdfSignal, BdfSignal])
 
-class _Base:
+
+class _Base(Generic[_Signal]):
     _header_fields = (
         ("version", 8),
         ("local_patient_identification", 80),
@@ -56,12 +57,13 @@ class _Base:
         ("data_record_duration", 8),
         ("num_signals", 4),
     )
-    _signals: tuple[EdfSignal | BdfSignal, ...]
-    _fmt: Literal["edf", "bdf"] = "edf"
+    _signals: tuple[_Signal, ...]
+    _signal_class: type[_Signal]
+    _fmt: ClassVar[Literal["EDF", "BDF"]]
 
     def __init__(
         self,
-        signals: Sequence[EdfSignal | BdfSignal],
+        signals: Sequence[_Signal],
         *,
         patient: Patient | None = None,
         recording: Recording | None = None,
@@ -86,7 +88,7 @@ class _Base:
 
         self._set_data_record_duration(data_record_duration)
         self._set_num_data_records_with_signals(signals)
-        self._set_version(0)
+        self._set_version()
         self.local_patient_identification = patient._to_str()
         self.local_recording_identification = recording._to_str()
         self._set_startdate_with_recording(recording)
@@ -97,12 +99,12 @@ class _Base:
         if annotations is not None or starttime.microsecond:
             signals = (
                 *signals,
-                _create_annotations_signal(
+                self._create_annotations_signal(
                     annotations if annotations is not None else (),
                     num_data_records=self.num_data_records,
                     data_record_duration=self.data_record_duration,
+                    with_timestamps=True,
                     subsecond_offset=starttime.microsecond / 1_000_000,
-                    fmt=self._fmt,
                 ),
             )
             self._set_reserved("EDF+C")
@@ -116,10 +118,10 @@ class _Base:
         annotations_text = f"{len(self.annotations)} annotation"
         if len(self.annotations) != 1:
             annotations_text += "s"
-        return f"<Edf {signals_text} {annotations_text}>"
+        return f"<{self.__class__.__name__} {signals_text} {annotations_text}>"
 
-    def _set_version(self, version: int) -> None:
-        self._version = encode_int(version, 8)
+    def _set_version(self) -> None:
+        raise NotImplementedError  # pragma: no cover
 
     def _set_bytes_in_header_record(self, bytes_in_header_record: int) -> None:
         self._bytes_in_header_record = encode_int(bytes_in_header_record, 8)
@@ -136,10 +138,16 @@ class _Base:
     def _set_num_signals(self, num_signals: int) -> None:
         self._num_signals = encode_int(num_signals, 4)
 
-    @property
-    def version(self) -> int:
-        """EDF version, always `0`."""
-        return int(decode_str(self._version))
+    def _create_annotations_signal(
+        self,
+        annotations: Iterable[EdfAnnotation],
+        *,
+        num_data_records: int,
+        data_record_duration: float,
+        with_timestamps: bool,
+        subsecond_offset: float,
+    ) -> _Signal:
+        raise NotImplementedError
 
     @property
     def local_patient_identification(self) -> str:
@@ -172,22 +180,30 @@ class _Base:
         self._local_recording_identification = encode_str(value, 80)
 
     def _load_data(  # noqa: PLR0912
-        self, file: Path | io.BufferedReader | io.BytesIO, *, lazy_load_data: bool
+        self,
+        file: Path
+        | io.BufferedReader
+        | io.BytesIO
+        | tempfile.SpooledTemporaryFile[bytes],
+        *,
+        lazy_load_data: bool,
     ) -> None:
-        if lazy_load_data and (self._fmt == "bdf" or not isinstance(file, Path)):
+        if lazy_load_data and (
+            self._signal_class == BdfSignal or not isinstance(file, Path)
+        ):
             raise ValueError(
                 "Lazy loading is only supported for local file paths in EDF format, "
-                f"got {type(file)} for {self._fmt_pretty} format"
+                f"got {type(file)} for {self._fmt} format"
             )
         lens = [signal.samples_per_data_record for signal in self._signals]
         datarecord_len = sum(lens)
         truncated = False
         # TODO: Someday maybe we can memmap BDF files, but for now let's just read all
         # https://stackoverflow.com/questions/12080279/how-do-i-create-a-numpy-dtype-that-includes-24-bit-integers
-        if self._fmt == "bdf":
+        if self._signal_class is BdfSignal:
             if isinstance(file, Path):
                 remaining_bytes = file.stat().st_size - self.bytes_in_header_record
-                data_bytes = file.read_bytes()
+                data_bytes = file.read_bytes()[self.bytes_in_header_record :]
             else:
                 data_bytes = file.read()
                 remaining_bytes = len(data_bytes)
@@ -227,12 +243,12 @@ class _Base:
             )
         if truncated:
             warnings.warn(
-                f"Incomplete data record at the end of the {self._fmt_pretty} file. "
+                f"Incomplete data record at the end of the {self._fmt} file. "
                 "Data was truncated."
             )
         if self.num_data_records != actual_records:
             warnings.warn(
-                f"{self._fmt_pretty} header indicates {self.num_data_records} data "
+                f"{self._fmt} header indicates {self.num_data_records} data "
                 f"records, but file contains {actual_records} records. Updating header."
             )
             self._set_num_data_records(actual_records)
@@ -241,13 +257,13 @@ class _Base:
 
         for signal, start, end in zip(self._signals, starts, ends):
             if lazy_load_data:
-                signal._lazy_loader = LazyLoader(datarecords, start, end)  # type: ignore[arg-type,unused-ignore]
+                signal._lazy_loader = LazyLoader(datarecords, start, end)  # type: ignore[arg-type]
             else:
-                signal._digital = datarecords[:, start:end].flatten()  # type: ignore[assignment,unused-ignore]
+                signal._digital = datarecords[:, start:end].flatten()  # type: ignore[assignment]
 
     def _read_header(
         self,
-        buffer: io.BufferedReader | io.BytesIO,
+        buffer: io.BufferedReader | io.BytesIO | tempfile.SpooledTemporaryFile[bytes],
         header_encoding: str,
     ) -> None:
         self._header_encoding = header_encoding
@@ -258,7 +274,7 @@ class _Base:
         )
 
     @property
-    def signals(self) -> tuple[EdfSignal | BdfSignal, ...]:
+    def signals(self) -> tuple[_Signal, ...]:
         """
         Ordinary signals contained in the recording.
 
@@ -268,17 +284,12 @@ class _Base:
         """
         return tuple(s for s in self._signals if s.label != "EDF Annotations")
 
-    @property
-    def _fmt_pretty(self) -> str:
-        return self._fmt.upper()  # "bdf" -> "BDF"
-
-    def _set_signals(self, signals: Sequence[EdfSignal | BdfSignal]) -> None:
+    def _set_signals(self, signals: Sequence[_Signal]) -> None:
         signals = tuple(signals)
         for si, signal in enumerate(signals):
-            if signal._fmt != self._fmt:
+            if type(signal) is not self._signal_class:
                 raise ValueError(
-                    f"Signal {si} ({signal}) has format {signal._fmt_pretty}, but "
-                    f"{self.__class__.__name__} is {self._fmt_pretty}"
+                    f"_Signal {si} ({signal}) has format {signal._fmt}, but recording is {self._fmt}"
                 )
         self._set_num_data_records_with_signals(signals)
         self._signals = signals
@@ -289,7 +300,7 @@ class _Base:
 
     def _set_num_data_records_with_signals(
         self,
-        signals: Sequence[EdfSignal | BdfSignal],
+        signals: Sequence[_Signal],
     ) -> None:
         if not signals:
             num_data_records = 1
@@ -316,7 +327,7 @@ class _Base:
         self,
         raw_signal_headers: bytes,
         header_encoding: str,
-    ) -> tuple[EdfSignal | BdfSignal, ...]:
+    ) -> tuple[_Signal, ...]:
         raw_headers_split: dict[str, list[bytes]] = {}
         start = 0
         for header_name, length in EdfSignal._header_fields:
@@ -326,8 +337,7 @@ class _Base:
                 raw_header[i : length + i] for i in range(0, len(raw_header), length)
             ]
             start = end
-        signals: list[EdfSignal | BdfSignal] = []
-        klass = EdfSignal if self._fmt == "edf" else BdfSignal
+        signals: list[_Signal] = []
         for i in range(self._total_num_signals):
             raw_signal_header = {
                 key: raw_headers_split[key][i] for key in raw_headers_split
@@ -341,7 +351,7 @@ class _Base:
                 if raw_signal_header["label"].rstrip() == b"EDF Annotations":
                     sampling_frequency = 0
             signals.append(
-                klass._from_raw_header(
+                self._signal_class._from_raw_header(  # type: ignore[arg-type]
                     sampling_frequency,
                     **raw_signal_header,
                     header_encoding=header_encoding,
@@ -379,11 +389,11 @@ class _Base:
         lens = [signal.samples_per_data_record for signal in self._signals]
         ends = np.cumsum(lens)
         starts = ends - lens
-        dtype = "<i2" if self._fmt == "edf" else "<i4"
+        dtype = "<i2" if self._signal_class is EdfSignal else "<i4"
         data_record = np.empty((num_data_records, sum(lens)), dtype=dtype)
         for signal, start, end in zip(self._signals, starts, ends):
             data_record[:, start:end] = signal.digital.reshape((-1, end - start))
-        if self._fmt == "bdf":
+        if self._signal_class is BdfSignal:
             data_record[data_record < 0] += 1 << 24
             data_record = data_record.view(np.uint8).reshape(-1, 4)[:, :3].ravel()
         if isinstance(target, str):
@@ -411,7 +421,7 @@ class _Base:
         """
         return tuple(s.label for s in self.signals)
 
-    def get_signal(self, label: str) -> EdfSignal | BdfSignal:
+    def get_signal(self, label: str) -> _Signal:
         """
         Retrieve a single signal by its label.
 
@@ -670,7 +680,7 @@ class _Base:
                     annotations.extend(annot_dr.annotations[1:])
                 else:
                     annotations.extend(annot_dr.annotations)
-            signals[idx] = _create_annotations_signal(
+            signals[idx] = self._create_annotations_signal(
                 [
                     EdfAnnotation(a.onset - self._subsecond_offset, a.duration, a.text)
                     for a in annotations
@@ -679,7 +689,6 @@ class _Base:
                 data_record_duration=data_record_duration,
                 with_timestamps=signal is self._timekeeping_signal,
                 subsecond_offset=self._subsecond_offset,
-                fmt=self._fmt,
             )
         self._signals = tuple(signals)
 
@@ -718,7 +727,7 @@ class _Base:
         """
         Drop signals by index or label.
 
-        Signal indices (int) and labels (str) can be provided in the same iterable. For
+        _Signal indices (int) and labels (str) can be provided in the same iterable. For
         ambiguous labels, all corresponding signals are dropped. Raises a ValueError if
         at least one of the provided identifiers does not correspond to a signal.
 
@@ -729,7 +738,7 @@ class _Base:
         """
         if isinstance(drop, str):
             drop = [drop]
-        selected: list[EdfSignal | BdfSignal] = []
+        selected: list[_Signal] = []
         dropped: list[int | str] = []
         i = 0
         for signal in self._signals:
@@ -748,7 +757,7 @@ class _Base:
         self._set_bytes_in_header_record(256 * (len(selected) + 1))
         self._set_num_signals(len(selected))
 
-    def append_signals(self, new_signals: EdfSignal | Iterable[EdfSignal]) -> None:
+    def append_signals(self, new_signals: _Signal | Iterable[_Signal]) -> None:
         """
         Append one or more signal(s) to the Edf recording.
 
@@ -762,8 +771,8 @@ class _Base:
         new_signals : EdfSignal | Iterable[EdfSignal]
             The signal(s) to add.
         """
-        if isinstance(new_signals, EdfSignal):
-            new_signals = [new_signals]
+        if isinstance(new_signals, (EdfSignal, BdfSignal)):
+            new_signals = [new_signals]  # type: ignore[list-item]
         last_ordinary_index = 0
         for i, signal in enumerate(self._signals):
             if signal.label != "EDF Annotations":
@@ -777,11 +786,11 @@ class _Base:
         )
 
     @property
-    def _annotation_signals(self) -> Iterable[EdfSignal | BdfSignal]:
+    def _annotation_signals(self) -> Iterable[_Signal]:
         return (signal for signal in self._signals if signal.label == "EDF Annotations")
 
     @property
-    def _timekeeping_signal(self) -> EdfSignal | BdfSignal:
+    def _timekeeping_signal(self) -> _Signal:
         return next(iter(self._annotation_signals))
 
     @property
@@ -893,12 +902,12 @@ class _Base:
         annotations : Iterable[EdfAnnotation]
             The annotations to set.
         """
-        new_annotation_signal = _create_annotations_signal(
+        new_annotation_signal = self._create_annotations_signal(
             annotations,
             num_data_records=self.num_data_records,
             data_record_duration=self.data_record_duration,
+            with_timestamps=True,
             subsecond_offset=self.starttime.microsecond / 1_000_000,
-            fmt=self._fmt,
         )
         self._set_signals((*self.signals, new_annotation_signal))
 
@@ -954,7 +963,7 @@ class _Base:
         keep_all_annotations : bool, default: False
             If set to `True`, annotations outside the selected time interval are kept.
         """
-        signals: list[EdfSignal | BdfSignal] = []
+        signals: list[_Signal] = []
         self._verify_seconds_inside_recording_time(start)
         self._verify_seconds_inside_recording_time(stop)
         self._verify_seconds_coincide_with_sample_time(start)
@@ -1062,12 +1071,12 @@ class _Base:
 
     def _slice_annotations_signal(
         self,
-        signal: EdfSignal | BdfSignal,
+        signal: _Signal,
         *,
         start: float,
         stop: float,
         keep_all_annotations: bool,
-    ) -> EdfSignal | BdfSignal:
+    ) -> _Signal:
         is_timekeeping_signal = signal == self._timekeeping_signal
         annotations: list[EdfAnnotation] = []
         for data_record in signal.digital.reshape((-1, signal.samples_per_data_record)):
@@ -1081,17 +1090,16 @@ class _Base:
             for a in annotations
             if keep_all_annotations or start <= a.onset < stop
         ]
-        return _create_annotations_signal(
+        return self._create_annotations_signal(
             annotations,
             num_data_records=self.num_data_records,
             data_record_duration=self.data_record_duration,
             with_timestamps=is_timekeeping_signal,
             subsecond_offset=self._subsecond_offset + start - int(start),
-            fmt=self._fmt,
         )
 
 
-class Edf(_Base):
+class Edf(_Base[EdfSignal]):
     """Python representation of an EDF file.
 
     EDF header fields are exposed as properties with appropriate data types (i.e.,
@@ -1129,10 +1137,36 @@ class Edf(_Base):
         `None`, an EDF+C file is created.
     """
 
-    _fmt: Literal["edf", "bdf"] = "edf"
+    _signal_class = EdfSignal
+    _fmt = "EDF"
+
+    def _set_version(self) -> None:
+        self._version = encode_int(0, 8)
+
+    @property
+    def version(self) -> int:
+        """EDF version, always `0`."""
+        return int(decode_str(self._version))
+
+    def _create_annotations_signal(
+        self,
+        annotations: Iterable[EdfAnnotation],
+        *,
+        num_data_records: int,
+        data_record_duration: float,
+        with_timestamps: bool,
+        subsecond_offset: float,
+    ) -> EdfSignal:
+        return _create_annotations_signal(
+            annotations,
+            num_data_records=num_data_records,
+            data_record_duration=data_record_duration,
+            with_timestamps=with_timestamps,
+            subsecond_offset=subsecond_offset,
+        )
 
 
-class Bdf(_Base):
+class Bdf(_Base[BdfSignal]):
     """Python representation of a BDF file.
 
     See :class:`Edf` for information on the header fields and their types.
@@ -1142,7 +1176,16 @@ class Bdf(_Base):
         The default for ``digital_range`` (and the supported depth) thus differs.
     """
 
-    _fmt: Literal["edf", "bdf"] = "bdf"
+    _signal_class = BdfSignal
+    _fmt = "BDF"
+
+    def _set_version(self) -> None:
+        self._version = b"\xffBIOSEMI"
+
+    @property
+    def version(self) -> str:
+        """The BDF version, always `�BIOSEMI`."""
+        return decode_str(self._version)
 
 
 def _calculate_num_data_records(
@@ -1158,56 +1201,45 @@ def _calculate_num_data_records(
         if required_num_data_records == int(required_num_data_records):
             return int(required_num_data_records)
     raise ValueError(
-        f"Signal duration of {signal_duration}s is not exactly divisible by data_record_duration of {data_record_duration}s"
+        f"_Signal duration of {signal_duration}s is not exactly divisible by data_record_duration of {data_record_duration}s"
     )
 
 
-def _calculate_data_record_duration(signals: Sequence[EdfSignal | BdfSignal]) -> float:
+def _calculate_data_record_duration(signals: Sequence[_Signal]) -> float:
     fs = (Fraction(s.sampling_frequency).limit_denominator(99999999) for s in signals)
     return math.lcm(*(fs_.denominator for fs_ in fs))
 
 
-@singledispatch
-def _read_edf(
-    edf_file: Any, *, lazy_load_data: bool, header_encoding: str
-) -> Edf | Bdf:
-    edf = object.__new__(Edf)
-    edf._read_header(edf_file, header_encoding)
-    edf._load_data(edf_file, lazy_load_data=lazy_load_data)
-    return edf
+_T = TypeVar("_T", bound=Union[Edf, Bdf])
 
 
-@_read_edf.register
-def _(edf_file: Path, *, lazy_load_data: bool, header_encoding: str) -> Edf | Bdf:
-    klass: type = Bdf if edf_file.suffix.lower() == ".bdf" else Edf
-    edf: Edf | Bdf = object.__new__(klass)
-    edf_file = edf_file.expanduser()
-    with edf_file.open("rb") as file:
-        edf._read_header(file, header_encoding)
-    edf._load_data(edf_file, lazy_load_data=lazy_load_data)
-    return edf
+def _read_file(
+    file: Path
+    | str
+    | io.BufferedReader
+    | io.BytesIO
+    | bytes
+    | tempfile.SpooledTemporaryFile[bytes],
+    *,
+    lazy_load_data: bool,
+    header_encoding: str,
+    class_: type[_T],
+) -> _T:
+    if isinstance(file, str):
+        file = Path(file)
+    if isinstance(file, bytes):
+        file = io.BytesIO(file)
+
+    rec = object.__new__(class_)
+    if isinstance(file, Path):
+        with file.expanduser().open("rb") as f:
+            rec._read_header(f, header_encoding)
+    else:
+        rec._read_header(file, header_encoding)
+    rec._load_data(file, lazy_load_data=lazy_load_data)
+    return rec
 
 
-@_read_edf.register
-def _(edf_file: str, *, lazy_load_data: bool, header_encoding: str) -> Edf | Bdf:
-    return _read_edf(
-        Path(edf_file),
-        lazy_load_data=lazy_load_data,
-        header_encoding=header_encoding,
-    )
-
-
-@_read_edf.register
-def _(edf_file: bytes, *, lazy_load_data: bool, header_encoding: str) -> Edf | Bdf:
-    return _read_edf(
-        io.BytesIO(edf_file),
-        lazy_load_data=lazy_load_data,
-        header_encoding=header_encoding,
-    )
-
-
-# Pyright loses information about parameters for singledispatch functions. Hiding it
-# behind this normal function makes things work again.
 def read_edf(
     edf_file: Path
     | str
@@ -1218,7 +1250,7 @@ def read_edf(
     lazy_load_data: bool | Literal["auto"] = "auto",
     *,
     header_encoding: str = "ascii",
-) -> Edf | Bdf:
+) -> Edf:
     """
     Read an EDF file into an :class:`Edf` object.
 
@@ -1242,11 +1274,45 @@ def read_edf(
         The resulting :class:`Edf` object.
     """
     if lazy_load_data == "auto":
-        lazy_load_data = isinstance(edf_file, (Path, str)) and not str(
-            edf_file
-        ).endswith(".bdf")
-    return _read_edf(
+        lazy_load_data = isinstance(edf_file, (Path, str))
+    return _read_file(
         edf_file,
         lazy_load_data=lazy_load_data,
         header_encoding=header_encoding,
+        class_=Edf,
+    )
+
+
+def read_bdf(
+    bdf_file: Path
+    | str
+    | io.BufferedReader
+    | io.BytesIO
+    | bytes
+    | tempfile.SpooledTemporaryFile[bytes],
+    *,
+    header_encoding: str = "ascii",
+) -> Bdf:
+    """
+    Read a BDF file into a :class:`Bdf` object.
+
+    If a file-like object is passed, its stream position is moved to EOF.
+
+    Parameters
+    ----------
+    bdf_file : Path | str | io.BufferedReader | io.BytesIO
+        The file location (path object or string) or file-like object to read from.
+    header_encoding : str, default: "ascii"
+        The character encoding to use when reading header fields.
+
+    Returns
+    -------
+    Bdf
+        The resulting :class:`Bdf` object.
+    """
+    return _read_file(
+        bdf_file,
+        lazy_load_data=False,
+        header_encoding=header_encoding,
+        class_=Bdf,
     )

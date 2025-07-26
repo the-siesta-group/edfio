@@ -10,6 +10,7 @@ import pytest
 
 from edfio import Edf, EdfSignal, read_edf
 from edfio._header_field import decode_date, decode_float, decode_time, encode_date
+from tests.conftest import _Context
 
 
 def test_q1_create_edf_signal_with_non_printable_character_in_label_fails():
@@ -105,7 +106,7 @@ def test_q8_edf_signal_where_digital_min_equals_digital_max_data_emits_warning_a
     signal._digital_min = b"0       "
     signal._digital_max = b"0       "
     with pytest.warns(UserWarning, match="Digital minimum equals .* uncalibrated .*"):
-        np.testing.assert_equal(signal.data, np.array([-32768, 32767]))
+        np.testing.assert_equal(signal.data, _Context.digital_range)
 
 
 def test_q8_edf_signal_where_physical_min_equals_physical_max_data_emits_warning_and_returns_uncalibrated():
@@ -113,7 +114,7 @@ def test_q8_edf_signal_where_physical_min_equals_physical_max_data_emits_warning
     signal._physical_min = b"0       "
     signal._physical_max = b"0       "
     with pytest.warns(UserWarning, match="Physical minimum equals .* uncalibrated .*"):
-        np.testing.assert_equal(signal.data, np.array([-32768, 32767]))
+        np.testing.assert_equal(signal.data, _Context.digital_range)
 
 
 @pytest.mark.parametrize(
@@ -147,7 +148,9 @@ def test_q11_num_data_records_not_specified(tmp_file: Path):
     edf._num_data_records = b"-1      "
     with pytest.warns(UserWarning, match="num_data_records=-1, determining correct"):
         edf.write(tmp_file)
-    with pytest.warns(UserWarning, match="EDF header indicates -1 data records, but"):
+    with pytest.warns(
+        UserWarning, match="[BE]DF header indicates -1 data records, but"
+    ):
         edf = read_edf(tmp_file)
     assert edf.num_data_records == 10
     assert edf.duration == 10
