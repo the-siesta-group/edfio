@@ -334,6 +334,38 @@ def test_changing_starttime_microseconds_does_not_shift_annotation_onsets(
     assert [ann.onset for ann in edf.annotations] == TEST_SUBSECOND_ANNOTATION_ONSETS
 
 
+def test_changing_starttime_microseconds_does_not_shift_annotation_onsets_for_multiple_annotation_signals():
+    edf = Edf(
+        signals=[
+            EdfSignal(np.arange(2), sampling_frequency=1),
+            _create_annotations_signal(
+                [
+                    EdfAnnotation(0, None, "sig 1 ann 1"),
+                    EdfAnnotation(0.5, None, "sig 1 ann 2"),
+                ],
+                num_data_records=2,
+                data_record_duration=1,
+            ),
+            _create_annotations_signal(
+                [
+                    EdfAnnotation(0.25, None, "sig 2 ann 1"),
+                    EdfAnnotation(0.75, None, "sig 2 ann 2"),
+                ],
+                num_data_records=2,
+                data_record_duration=1,
+                with_timestamps=False,
+            ),
+        ],
+    )
+    edf.starttime = edf.starttime.replace(microsecond=1)
+    assert edf.annotations == (
+        EdfAnnotation(0, None, "sig 1 ann 1"),
+        EdfAnnotation(0.25, None, "sig 2 ann 1"),
+        EdfAnnotation(0.5, None, "sig 1 ann 2"),
+        EdfAnnotation(0.75, None, "sig 2 ann 2"),
+    )
+
+
 def test_annotation_onsets_are_written_correctly_for_new_edf_with_microsecond_starttime(
     tmp_file: Path,
 ):

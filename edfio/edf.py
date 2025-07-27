@@ -543,24 +543,24 @@ class _Base(Generic[_Signal]):
         onset_change = starttime.microsecond / 1000000 - self._subsecond_offset
         self._starttime = encode_time(starttime.replace(microsecond=0))
         if starttime.microsecond != self.starttime.microsecond:
-            timekeeping_signal = self._timekeeping_signal
-            data_records = []
-            for data_record in timekeeping_signal.digital.reshape(
-                (-1, timekeeping_signal.samples_per_data_record)
-            ):
-                annot_dr = _EdfAnnotationsDataRecord.from_bytes(data_record.tobytes())
-                for tal in annot_dr.tals:
-                    tal.onset = round(tal.onset + onset_change, 12)
-                data_records.append(annot_dr.to_bytes())
-            maxlen = max(len(data_record) for data_record in data_records)
-            if maxlen % 2:
-                maxlen += 1
-            raw = b"".join(dr.ljust(maxlen, b"\x00") for dr in data_records)
-            timekeeping_signal._set_samples_per_data_record(maxlen // 2)
-            timekeeping_signal._sampling_frequency = (
-                maxlen // 2 * self.data_record_duration
-            )
-            timekeeping_signal._digital = np.frombuffer(raw, dtype=np.int16)
+            for annotation_signal in self._annotation_signals:
+                data_records = []
+                for data_record in annotation_signal.digital.reshape(
+                    (-1, annotation_signal.samples_per_data_record)
+                ):
+                    ann_dr = _EdfAnnotationsDataRecord.from_bytes(data_record.tobytes())
+                    for tal in ann_dr.tals:
+                        tal.onset = round(tal.onset + onset_change, 12)
+                    data_records.append(ann_dr.to_bytes())
+                maxlen = max(len(data_record) for data_record in data_records)
+                if maxlen % 2:
+                    maxlen += 1
+                raw = b"".join(dr.ljust(maxlen, b"\x00") for dr in data_records)
+                annotation_signal._set_samples_per_data_record(maxlen // 2)
+                annotation_signal._sampling_frequency = (
+                    maxlen // 2 * self.data_record_duration
+                )
+                annotation_signal._digital = np.frombuffer(raw, dtype=np.int16)
 
     def _set_startdate_with_recording(self, recording: Recording) -> None:
         try:
