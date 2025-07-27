@@ -42,9 +42,9 @@ from edfio.edf_header import (
 )
 from edfio.edf_signal import BdfSignal, EdfSignal
 
-if sys.version_info < (3, 11):
+if sys.version_info < (3, 11):  # pragma: no cover
     from typing_extensions import Self
-else:
+else:  # pragma: no cover
     from typing import Self
 
 

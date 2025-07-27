@@ -17,9 +17,9 @@ from edfio._header_field import (
 )
 from edfio._lazy_loading import LazyLoader, _DigitalDtype
 
-if sys.version_info < (3, 11):
+if sys.version_info < (3, 11):  # pragma: no cover
     from typing_extensions import Self
-else:
+else:  # pragma: no cover
     from typing import Self
 
 
