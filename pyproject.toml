@@ -101,9 +101,6 @@ convention = "numpy"
 
 [tool.pytest.ini_options]
 markers = ["edf: mark test as EDF specific", "bdf: mark test as BDF specific"]
-filterwarnings = [
-    "ignore:The distutils package is deprecated.*:DeprecationWarning",
-]
 
 [tool.coverage.run]
 source_dirs = ["edfio", "tests"]
