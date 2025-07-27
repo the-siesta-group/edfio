@@ -20,8 +20,10 @@ from edfio.edf_annotations import (
 )
 from tests import TEST_DATA_DIR
 
+EDF_FILE = TEST_DATA_DIR / "short_psg.edf"
 MNE_TEST_FILE = TEST_DATA_DIR / "mne_test.edf"
 SUBSECOND_TEST_FILE = TEST_DATA_DIR / "test_subsecond.edf"
+ONLY_ANNOTATIONS_FILE = TEST_DATA_DIR / "SC4001EC-Hypnogram.edf"
 
 MNE_TEST_ANNOTATIONS = (
     EdfAnnotation(onset=0.0, duration=None, text="start"),
@@ -172,7 +174,7 @@ def test_parse_annotations_raises_error_for_invalid_timing(raw_annotations: byte
 
 
 def test_annotations_are_empty_for_legacy_edf():
-    assert read_edf(TEST_DATA_DIR / "short_psg.edf").annotations == ()
+    assert read_edf(EDF_FILE).annotations == ()
 
 
 def test_read_write_does_not_change_edfplus_with_annotations(tmp_file: Path):
@@ -186,7 +188,7 @@ def test_write_edf_with_annotations(tmp_file: Path):
     Edf([EdfSignal(np.arange(10), 1)], annotations=annotations).write(tmp_file)
     edf = read_edf(tmp_file)
     assert edf.annotations == annotations
-    assert edf.reserved == "EDF+C"
+    assert edf.reserved == f"{edf._fmt}+C"
     assert edf.num_signals == 1
     assert edf._total_num_signals == 2
 
@@ -294,6 +296,7 @@ def test_edf_annotations_multiple_annotation_signals():
                     EdfAnnotation(0, None, "sig 1 ann 1"),
                     EdfAnnotation(0.5, None, "sig 1 ann 2"),
                 ],
+                signal_class=EdfSignal,
                 num_data_records=2,
                 data_record_duration=1,
             ),
@@ -302,6 +305,7 @@ def test_edf_annotations_multiple_annotation_signals():
                     EdfAnnotation(0.25, None, "sig 2 ann 1"),
                     EdfAnnotation(0.75, None, "sig 2 ann 2"),
                 ],
+                signal_class=EdfSignal,
                 num_data_records=2,
                 data_record_duration=1,
                 with_timestamps=False,
@@ -343,6 +347,7 @@ def test_changing_starttime_microseconds_does_not_shift_annotation_onsets_for_mu
                     EdfAnnotation(0, None, "sig 1 ann 1"),
                     EdfAnnotation(0.5, None, "sig 1 ann 2"),
                 ],
+                signal_class=EdfSignal,
                 num_data_records=2,
                 data_record_duration=1,
             ),
@@ -351,6 +356,7 @@ def test_changing_starttime_microseconds_does_not_shift_annotation_onsets_for_mu
                     EdfAnnotation(0.25, None, "sig 2 ann 1"),
                     EdfAnnotation(0.75, None, "sig 2 ann 2"),
                 ],
+                signal_class=EdfSignal,
                 num_data_records=2,
                 data_record_duration=1,
                 with_timestamps=False,
@@ -385,16 +391,16 @@ def test_annotation_onsets_are_written_correctly_for_new_edf_with_microsecond_st
 
 
 def test_creating_edf_with_microsecond_starttime_without_annotations_emits_warning():
-    with pytest.warns(UserWarning, match="Creating EDF\\+C to store microsecond"):
+    with pytest.warns(UserWarning, match="Creating [BE]DF\\+C to store microsecond"):
         edf = Edf([EdfSignal(np.arange(2), 1)], starttime=datetime.time(0, 0, 0, 1))
     assert edf.starttime.microsecond == 1
-    assert edf.reserved == "EDF+C"
+    assert edf.reserved == f"{edf._fmt}+C"
 
 
 def test_read_edf_containing_only_annotations():
     # testfile from
     # https://www.physionet.org/content/sleep-edfx/1.0.0/sleep-cassette/SC4001EC-Hypnogram.edf
-    edf = read_edf(TEST_DATA_DIR / "SC4001EC-Hypnogram.edf")
+    edf = read_edf(ONLY_ANNOTATIONS_FILE)
     assert len(edf.annotations) == 154
 
 
@@ -423,13 +429,14 @@ def test_starttime_raises_helpful_error_for_invalid_timestamp_annotation():
             EdfSignal(np.arange(1), 1),
             _create_annotations_signal(
                 [EdfAnnotation(2.345, None, "")],
+                signal_class=EdfSignal,
                 num_data_records=1,
                 data_record_duration=1,
                 with_timestamps=False,
             ),
         ]
     )
-    edf._reserved = b"EDF+C".ljust(44)
+    edf._reserved = f"{edf._fmt}+C".ljust(44).encode()
     with pytest.raises(ValueError, match="Subsecond offset in first annotation must"):
         edf.starttime
 
@@ -461,6 +468,7 @@ def test_set_annotations_removes_all_existing_annotation_signals(tmp_file: Path)
                     EdfAnnotation(0, None, "sig 1 ann 1"),
                     EdfAnnotation(0.5, None, "sig 1 ann 2"),
                 ],
+                signal_class=EdfSignal,
                 num_data_records=2,
                 data_record_duration=1,
             ),
@@ -470,6 +478,7 @@ def test_set_annotations_removes_all_existing_annotation_signals(tmp_file: Path)
                     EdfAnnotation(0.25, None, "sig 2 ann 1"),
                     EdfAnnotation(0.75, None, "sig 2 ann 2"),
                 ],
+                signal_class=EdfSignal,
                 num_data_records=2,
                 data_record_duration=1,
                 with_timestamps=False,
@@ -483,7 +492,11 @@ def test_set_annotations_removes_all_existing_annotation_signals(tmp_file: Path)
     edf = read_edf(tmp_file)
     assert edf.annotations == new_annotations
     assert edf.labels == ("EEG 1", "EEG 2")
-    assert [s.label for s in edf._signals] == ["EEG 1", "EEG 2", "EDF Annotations"]
+    assert [s.label for s in edf._signals] == [
+        "EEG 1",
+        "EEG 2",
+        f"{edf._fmt} Annotations",
+    ]
 
 
 def test_add_annotations(tmp_file: Path):

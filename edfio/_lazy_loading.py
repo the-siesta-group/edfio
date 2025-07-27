@@ -1,10 +1,12 @@
-from typing import Any, Optional, Union
+from typing import Any, Generic, Optional, TypeVar, Union
 
 import numpy as np
 from numpy.typing import NDArray
 
+_DigitalDtype = TypeVar("_DigitalDtype", bound=Union[np.int16, np.int32])
 
-class LazyLoader:
+
+class LazyLoader(Generic[_DigitalDtype]):
     """
     Class to load data for a single signal from a buffer of EDF data records (array or memmap).
 
@@ -20,10 +22,7 @@ class LazyLoader:
 
     def __init__(
         self,
-        buffer: Union[
-            NDArray[Union[np.int16, np.int32]],
-            np.memmap[Any, np.dtype[Union[np.int16, np.int32]]],
-        ],
+        buffer: Union[NDArray[_DigitalDtype], np.memmap[Any, np.dtype[_DigitalDtype]]],
         start_sample: int,
         end_sample: int,
     ) -> None:
@@ -33,7 +32,7 @@ class LazyLoader:
 
     def load(
         self, start_record: Optional[int] = None, end_record: Optional[int] = None
-    ) -> NDArray[Union[np.int16, np.int32]]:
+    ) -> NDArray[_DigitalDtype]:
         """
         Load signal data from the buffer.
 

@@ -378,13 +378,15 @@ def test_rounding_of_physical_range_does_not_produce_clipping_or_integer_overflo
 
 
 def test_edf_signal_init_does_not_accept_edf_annotations_as_label():
-    with pytest.raises(ValueError, match="must not be 'EDF Annotations'"):
-        EdfSignal(np.arange(2), 1, label="EDF Annotations")
+    annsig_label = f"{EdfSignal._fmt} Annotations"
+    with pytest.raises(ValueError, match=f"must not be '{annsig_label}'"):
+        EdfSignal(np.arange(2), 1, label=f"{annsig_label}")
 
 
 def test_edf_signal_label_cannot_be_set_to_edf_annotations():
-    with pytest.raises(ValueError, match="must not be 'EDF Annotations'"):
-        EdfSignal(np.arange(2), 1).label = "EDF Annotations"
+    annsig_label = f"{EdfSignal._fmt} Annotations"
+    with pytest.raises(ValueError, match=f"must not be '{annsig_label}'"):
+        EdfSignal(np.arange(2), 1).label = f"{annsig_label}"
 
 
 def test_get_data_slice_already_loaded():

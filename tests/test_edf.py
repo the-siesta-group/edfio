@@ -170,19 +170,9 @@ def test_edf_repr(num_signals: int, num_annotations: int, expected: str):
 @pytest.mark.parametrize(
     ("num_signals", "num_annotations", "expected"),
     [
-        pytest.param(
-            1,
-            1,
-            "<Bdf 1 signal 1 annotation>",
-            marks=pytest.mark.xfail(reason="Annotations not supported for BDF yet"),
-        ),
+        (1, 1, "<Bdf 1 signal 1 annotation>"),
         (2, 0, "<Bdf 2 signals 0 annotations>"),
-        pytest.param(
-            0,
-            2,
-            "<Bdf 0 signals 2 annotations>",
-            marks=pytest.mark.xfail(reason="Annotations not supported for BDF yet"),
-        ),
+        (0, 2, "<Bdf 0 signals 2 annotations>"),
     ],
 )
 def test_bdf_repr(num_signals: int, num_annotations: int, expected: str):
@@ -559,7 +549,6 @@ def test_edf_slice_between_seconds():
     np.testing.assert_array_equal(edf.signals[2].data, np.arange(512, 768))
 
 
-@pytest.mark.edf
 def test_edf_slice_between_seconds_modifies_header_fields():
     edf = Edf(
         [EdfSignal(np.arange(1200 * 10), 10)],
@@ -742,6 +731,7 @@ def test_edf_slice_between_annotations_works_for_multiple_annotation_signals():
                 ],
                 num_data_records=10,
                 data_record_duration=1,
+                signal_class=EdfSignal,
             ),
             _create_annotations_signal(
                 [
@@ -751,6 +741,7 @@ def test_edf_slice_between_annotations_works_for_multiple_annotation_signals():
                 num_data_records=10,
                 data_record_duration=1,
                 with_timestamps=False,
+                signal_class=EdfSignal,
             ),
         ],
     )
@@ -832,7 +823,7 @@ def test_edf_with_only_annotations_can_be_written(tmp_file: Path):
     Edf([], annotations=annotations).write(tmp_file)
     edf = read_edf(tmp_file)
     assert edf.bytes_in_header_record == 512
-    assert edf.reserved == "EDF+C"
+    assert edf.reserved == f"{edf._fmt}+C"
     assert edf.data_record_duration == 0
     assert edf.num_signals == 0
     assert edf._total_num_signals == 1
@@ -869,6 +860,7 @@ def test_drop_signals_keeps_position_of_annotation_signals():
                 [EdfAnnotation(0, None, "ann 1")],
                 num_data_records=2,
                 data_record_duration=1,
+                signal_class=EdfSignal,
             ),
             EdfSignal(np.arange(2), 1, label="EEG 3"),
             EdfSignal(np.arange(2), 1, label="EEG 4"),
@@ -877,14 +869,15 @@ def test_drop_signals_keeps_position_of_annotation_signals():
                 num_data_records=2,
                 data_record_duration=1,
                 with_timestamps=False,
+                signal_class=EdfSignal,
             ),
             EdfSignal(np.arange(2), 1, label="EEG 5"),
         ],
     )
     edf.drop_signals([0, 3])
     assert edf.labels == ("EEG 2", "EEG 3", "EEG 5")
-    assert edf._signals[1].label == "EDF Annotations"
-    assert edf._signals[3].label == "EDF Annotations"
+    assert edf._signals[1].label == f"{edf._fmt} Annotations"
+    assert edf._signals[3].label == f"{edf._fmt} Annotations"
     assert edf.annotations == (
         EdfAnnotation(0, None, "ann 1"),
         EdfAnnotation(0.25, None, "ann 2"),
@@ -925,18 +918,25 @@ def test_append_signals_multiple():
         assert actual == expected
 
 
-@pytest.mark.edf
 def test_append_signals_appends_after_last_ordinary_signal():
     edf = Edf(
         [
             EdfSignal(np.arange(3), 1, label="S1"),
             EdfSignal(np.arange(3), 1, label="S2"),
             _create_annotations_signal(
-                (), data_record_duration=1, num_data_records=3, with_timestamps=True
+                (),
+                data_record_duration=1,
+                signal_class=EdfSignal,
+                num_data_records=3,
+                with_timestamps=True,
             ),
             EdfSignal(np.arange(3), 1, label="S3"),
             _create_annotations_signal(
-                (), data_record_duration=1, num_data_records=3, with_timestamps=True
+                (),
+                data_record_duration=1,
+                signal_class=EdfSignal,
+                num_data_records=3,
+                with_timestamps=True,
             ),
         ]
     )
@@ -946,7 +946,8 @@ def test_append_signals_appends_after_last_ordinary_signal():
             EdfSignal(np.arange(3), 1, label="S5"),
         ]
     )
-    expected = ["S1", "S2", "EDF Annotations", "S3", "S4", "S5", "EDF Annotations"]
+    annsig_label = f"{edf._fmt} Annotations"
+    expected = ["S1", "S2", annsig_label, "S3", "S4", "S5", annsig_label]
     assert [s.label for s in edf._signals] == expected
 
 
@@ -1103,12 +1104,14 @@ def test_update_data_record_duration_with_multiple_annotations_signals(tmp_file:
             _create_annotations_signal(
                 expected_annotations1,
                 data_record_duration=1,
+                signal_class=EdfSignal,
                 num_data_records=3,
                 with_timestamps=True,
             ),
             _create_annotations_signal(
                 expected_annotations2,
                 data_record_duration=1,
+                signal_class=EdfSignal,
                 num_data_records=3,
                 with_timestamps=False,
             ),

@@ -89,13 +89,20 @@ def test_q7_float_decode_fails_on_comma():
         decode_float(b"-123,456")
 
 
-def test_q8_read_uncalibrated_signal(tmp_file: Path):
+@pytest.mark.parametrize(
+    "digital_dtype",
+    [
+        pytest.param(np.int16, marks=pytest.mark.edf),
+        pytest.param(np.int32, marks=pytest.mark.bdf),
+    ],
+)
+def test_q8_read_uncalibrated_signal(digital_dtype, tmp_file: Path):
     signal = EdfSignal(np.arange(10), 1)
     signal._physical_min = b"        "
     signal._physical_max = b"        "
     signal._digital_min = b"        "
     signal._digital_max = b"        "
-    signal._digital = np.arange(10, dtype=np.int16)
+    signal._digital = np.arange(10, dtype=digital_dtype)
     Edf(signals=[signal]).write(tmp_file)
     edf = read_edf(tmp_file)
     np.testing.assert_equal(edf.signals[0].data, np.arange(10))

@@ -57,15 +57,6 @@ def inject_classes(request):
     }
     format = request.param
     file_class, signal_class, digital_range, bits, read_func = formats[format]
-    if (
-        format == "bdf"
-        and not request.node.get_closest_marker("bdf")
-        and any(
-            s in request.node.name
-            for s in ("annotation", "subsecond", "microsecond", "edfplus")
-        )
-    ):
-        pytest.xfail("Annotations not supported for BDF yet")
     if not request.node.get_closest_marker(format):
         for name, param in request.node.callspec.params.items():
             if isinstance(param, (Edf, EdfSignal)):
@@ -79,6 +70,11 @@ def inject_classes(request):
     _Context.digital_range = digital_range
     _Context.bits = bits
     _Context.format = format
-    for file_constant in ("EDF_FILE", "MNE_TEST_FILE", "SUBSECOND_TEST_FILE"):
+    for file_constant in (
+        "EDF_FILE",
+        "MNE_TEST_FILE",
+        "SUBSECOND_TEST_FILE",
+        "ONLY_ANNOTATIONS_FILE",
+    ):
         if path := getattr(module, file_constant, None):
             setattr(module, file_constant, path.with_suffix(f".{format}"))

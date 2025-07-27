@@ -5,6 +5,7 @@ import copy
 import datetime
 import io
 import math
+import sys
 import tempfile
 import warnings
 from collections.abc import Iterable, Sequence
@@ -40,6 +41,12 @@ from edfio.edf_header import (
     _encode_edfplus_date,
 )
 from edfio.edf_signal import BdfSignal, EdfSignal
+
+if sys.version_info < (3, 11):
+    from typing_extensions import Self
+else:
+    from typing import Self
+
 
 _Signal = TypeVar("_Signal", bound=Union[EdfSignal, BdfSignal])
 
@@ -95,19 +102,20 @@ class _Base(Generic[_Signal]):
         self._starttime = encode_time(starttime.replace(microsecond=0))
         self._set_reserved("")
         if starttime.microsecond and annotations is None:
-            warnings.warn("Creating EDF+C to store microsecond starttime.")
+            warnings.warn(f"Creating {self._fmt}+C to store microsecond starttime.")
         if annotations is not None or starttime.microsecond:
             signals = (
                 *signals,
-                self._create_annotations_signal(
+                _create_annotations_signal(
                     annotations if annotations is not None else (),
                     num_data_records=self.num_data_records,
                     data_record_duration=self.data_record_duration,
+                    signal_class=self._signal_class,
                     with_timestamps=True,
                     subsecond_offset=starttime.microsecond / 1_000_000,
                 ),
             )
-            self._set_reserved("EDF+C")
+            self._set_reserved(f"{self._fmt}+C")
         self._set_signals(signals)
         self._header_encoding = "ascii"
 
@@ -137,17 +145,6 @@ class _Base(Generic[_Signal]):
 
     def _set_num_signals(self, num_signals: int) -> None:
         self._num_signals = encode_int(num_signals, 4)
-
-    def _create_annotations_signal(
-        self,
-        annotations: Iterable[EdfAnnotation],
-        *,
-        num_data_records: int,
-        data_record_duration: float,
-        with_timestamps: bool,
-        subsecond_offset: float,
-    ) -> _Signal:
-        raise NotImplementedError
 
     @property
     def local_patient_identification(self) -> str:
@@ -257,7 +254,11 @@ class _Base(Generic[_Signal]):
 
         for signal, start, end in zip(self._signals, starts, ends):
             if lazy_load_data:
-                signal._lazy_loader = LazyLoader(datarecords, start, end)  # type: ignore[arg-type]
+                signal._lazy_loader = LazyLoader(datarecords, start, end)  # type: ignore[type-var, assignment]
+            elif signal.label == "BDF Annotations":
+                digital = datarecords[:, start:end].flatten()
+                digital = digital.view(np.uint8).reshape(-1, 4)[:, :3].flatten()
+                signal._digital = digital  # type: ignore[assignment]
             else:
                 signal._digital = datarecords[:, start:end].flatten()  # type: ignore[assignment]
 
@@ -282,7 +283,7 @@ class _Base(Generic[_Signal]):
         or replaced by modifying this property. Use :meth:`Edf.append_signals`,
         :meth:`Edf.drop_signals`, or :attr:`EdfSignal.data`, respectively.
         """
-        return tuple(s for s in self._signals if s.label != "EDF Annotations")
+        return tuple(s for s in self._signals if not s._is_annotation_signal)
 
     def _set_signals(self, signals: Sequence[_Signal]) -> None:
         signals = tuple(signals)
@@ -295,7 +296,7 @@ class _Base(Generic[_Signal]):
         self._signals = signals
         self._set_bytes_in_header_record(256 * (len(signals) + 1))
         self._set_num_signals(len(signals))
-        if all(s.label == "EDF Annotations" for s in signals):
+        if all(s._is_annotation_signal for s in signals):
             self._set_data_record_duration(0)
 
     def _set_num_data_records_with_signals(
@@ -306,7 +307,7 @@ class _Base(Generic[_Signal]):
             num_data_records = 1
         else:
             signal_durations = [
-                round(len(s.digital) / s.sampling_frequency, 12) for s in signals
+                round(s._num_samples / s.sampling_frequency, 12) for s in signals
             ]
             if any(v != signal_durations[0] for v in signal_durations[1:]):
                 raise ValueError(
@@ -316,7 +317,7 @@ class _Base(Generic[_Signal]):
                 signal_durations[0],
                 self.data_record_duration,
             )
-            signal_lengths = [len(s.digital) for s in signals]
+            signal_lengths = [s._num_samples for s in signals]
             if any(l % num_data_records for l in signal_lengths):
                 raise ValueError(
                     f"Not all signal lengths can be split into {num_data_records} data records: {signal_lengths}"
@@ -348,7 +349,10 @@ class _Base(Generic[_Signal]):
                     / self.data_record_duration
                 )
             except ZeroDivisionError:
-                if raw_signal_header["label"].rstrip() == b"EDF Annotations":
+                if (
+                    raw_signal_header["label"].rstrip()
+                    == f"{self._fmt} Annotations".encode()
+                ):
                     sampling_frequency = 0
             signals.append(
                 self._signal_class._from_raw_header(  # type: ignore[arg-type]
@@ -359,7 +363,7 @@ class _Base(Generic[_Signal]):
             )
         return tuple(signals)
 
-    def write(self, target: Path | str | io.BufferedWriter | io.BytesIO) -> None:
+    def write(self, target: Path | str | io.BufferedWriter | io.BytesIO) -> None:  # noqa: PLR0912
         """
         Write an Edf to a file or file-like object.
 
@@ -371,13 +375,13 @@ class _Base(Generic[_Signal]):
         if self.num_data_records == -1:
             warnings.warn("num_data_records=-1, determining correct value from data")
             num_data_records = _calculate_num_data_records(
-                len(self._signals[0].digital) * self._signals[0].sampling_frequency,
+                self._signals[0]._num_samples * self._signals[0].sampling_frequency,
                 self.data_record_duration,
             )
         else:
             num_data_records = self.num_data_records
         for signal in self._signals:
-            signal._set_samples_per_data_record(len(signal.digital) // num_data_records)
+            signal._set_samples_per_data_record(signal._num_samples // num_data_records)
         header_records = []
         for header_name, _ in Edf._header_fields:
             header_records.append(getattr(self, "_" + header_name))
@@ -386,16 +390,20 @@ class _Base(Generic[_Signal]):
                 header_records.append(getattr(signal, "_" + header_name))
         header_record = b"".join(header_records)
 
-        lens = [signal.samples_per_data_record for signal in self._signals]
+        lens = [s.samples_per_data_record * s._bytes_per_sample for s in self._signals]
         ends = np.cumsum(lens)
         starts = ends - lens
-        dtype = "<i2" if self._signal_class is EdfSignal else "<i4"
-        data_record = np.empty((num_data_records, sum(lens)), dtype=dtype)
+        data_record = np.empty((num_data_records, sum(lens)), dtype=np.uint8)
         for signal, start, end in zip(self._signals, starts, ends):
-            data_record[:, start:end] = signal.digital.reshape((-1, end - start))
-        if self._signal_class is BdfSignal:
-            data_record[data_record < 0] += 1 << 24
-            data_record = data_record.view(np.uint8).reshape(-1, 4)[:, :3].ravel()
+            if self._signal_class is EdfSignal or signal.label == "BDF Annotations":
+                data = signal.digital.view(np.uint8).reshape(num_data_records, -1)
+            else:
+                data = (
+                    signal.digital.view(np.uint8)
+                    .reshape(-1, 4)[:, :3]
+                    .reshape(num_data_records, -1)
+                )
+            data_record[:, start:end] = data
         if isinstance(target, str):
             target = Path(target)
         if isinstance(target, io.BufferedWriter):
@@ -544,23 +552,25 @@ class _Base(Generic[_Signal]):
         self._starttime = encode_time(starttime.replace(microsecond=0))
         if starttime.microsecond != self.starttime.microsecond:
             for annotation_signal in self._annotation_signals:
+                bytes_per_sample = annotation_signal._bytes_per_sample
                 data_records = []
                 for data_record in annotation_signal.digital.reshape(
-                    (-1, annotation_signal.samples_per_data_record)
+                    -1, annotation_signal._bytes_per_data_record
                 ):
                     ann_dr = _EdfAnnotationsDataRecord.from_bytes(data_record.tobytes())
                     for tal in ann_dr.tals:
                         tal.onset = round(tal.onset + onset_change, 12)
                     data_records.append(ann_dr.to_bytes())
                 maxlen = max(len(data_record) for data_record in data_records)
-                if maxlen % 2:
-                    maxlen += 1
+                maxlen = math.ceil(maxlen / bytes_per_sample) * bytes_per_sample
                 raw = b"".join(dr.ljust(maxlen, b"\x00") for dr in data_records)
-                annotation_signal._set_samples_per_data_record(maxlen // 2)
-                annotation_signal._sampling_frequency = (
-                    maxlen // 2 * self.data_record_duration
+                annotation_signal._set_samples_per_data_record(
+                    maxlen // bytes_per_sample
                 )
-                annotation_signal._digital = np.frombuffer(raw, dtype=np.int16)
+                annotation_signal._sampling_frequency = (
+                    maxlen // bytes_per_sample * self.data_record_duration
+                )
+                annotation_signal._digital = np.frombuffer(raw, dtype=np.uint8)  # type: ignore[assignment]
 
     def _set_startdate_with_recording(self, recording: Recording) -> None:
         try:
@@ -673,20 +683,21 @@ class _Base(Generic[_Signal]):
                 continue
             annotations = []
             for data_record in signal.digital.reshape(
-                (-1, signal.samples_per_data_record)
+                (-1, signal._bytes_per_data_record)
             ):
                 annot_dr = _EdfAnnotationsDataRecord.from_bytes(data_record.tobytes())
                 if signal is self._timekeeping_signal:
                     annotations.extend(annot_dr.annotations[1:])
                 else:
                     annotations.extend(annot_dr.annotations)
-            signals[idx] = self._create_annotations_signal(
+            signals[idx] = _create_annotations_signal(
                 [
                     EdfAnnotation(a.onset - self._subsecond_offset, a.duration, a.text)
                     for a in annotations
                 ],
                 num_data_records=num_data_records,
                 data_record_duration=data_record_duration,
+                signal_class=self._signal_class,
                 with_timestamps=signal is self._timekeeping_signal,
                 subsecond_offset=self._subsecond_offset,
             )
@@ -742,7 +753,7 @@ class _Base(Generic[_Signal]):
         dropped: list[int | str] = []
         i = 0
         for signal in self._signals:
-            if signal.label == "EDF Annotations":
+            if signal._is_annotation_signal:
                 selected.append(signal)
                 continue
             if i in drop or signal.label in drop:
@@ -775,7 +786,7 @@ class _Base(Generic[_Signal]):
             new_signals = [new_signals]  # type: ignore[list-item]
         last_ordinary_index = 0
         for i, signal in enumerate(self._signals):
-            if signal.label != "EDF Annotations":
+            if not signal._is_annotation_signal:
                 last_ordinary_index = i
         self._set_signals(
             [
@@ -787,7 +798,7 @@ class _Base(Generic[_Signal]):
 
     @property
     def _annotation_signals(self) -> Iterable[_Signal]:
-        return (signal for signal in self._signals if signal.label == "EDF Annotations")
+        return (s for s in self._signals if s._is_annotation_signal)
 
     @property
     def _timekeeping_signal(self) -> _Signal:
@@ -832,7 +843,7 @@ class _Base(Generic[_Signal]):
                 adjusted_stop = last_record * self.data_record_duration
                 digital_slice = signal.get_digital_slice(adjusted_start, adjusted_stop)
             for data_record in digital_slice.reshape(
-                (-1, signal.samples_per_data_record)
+                (-1, signal._bytes_per_data_record)
             ):
                 annot_dr = _EdfAnnotationsDataRecord.from_bytes(data_record.tobytes())
                 if i == 0:
@@ -879,15 +890,15 @@ class _Base(Generic[_Signal]):
         """
         for signal in self._annotation_signals:
             for data_record in signal.digital.reshape(
-                (-1, signal.samples_per_data_record)
+                (-1, signal._bytes_per_data_record)
             ):
                 annotations = _EdfAnnotationsDataRecord.from_bytes(
                     data_record.tobytes()
                 )
                 annotations.drop_annotations_with_text(text)
                 data_record[:] = np.frombuffer(
-                    annotations.to_bytes().ljust(len(data_record) * 2, b"\x00"),
-                    dtype=np.int16,
+                    annotations.to_bytes().ljust(len(data_record), b"\x00"),
+                    dtype=np.uint8,
                 )
 
     def set_annotations(self, annotations: Iterable[EdfAnnotation]) -> None:
@@ -902,10 +913,11 @@ class _Base(Generic[_Signal]):
         annotations : Iterable[EdfAnnotation]
             The annotations to set.
         """
-        new_annotation_signal = self._create_annotations_signal(
+        new_annotation_signal = _create_annotations_signal(
             annotations,
             num_data_records=self.num_data_records,
             data_record_duration=self.data_record_duration,
+            signal_class=self._signal_class,
             with_timestamps=True,
             subsecond_offset=self.starttime.microsecond / 1_000_000,
         )
@@ -970,7 +982,7 @@ class _Base(Generic[_Signal]):
         self._verify_seconds_coincide_with_sample_time(stop)
         self._set_num_data_records(int((stop - start) / self.data_record_duration))
         for signal in self._signals:
-            if signal.label == "EDF Annotations":
+            if signal._is_annotation_signal:
                 signals.append(
                     self._slice_annotations_signal(
                         signal,
@@ -982,7 +994,7 @@ class _Base(Generic[_Signal]):
             else:
                 start_index = start * signal.sampling_frequency
                 stop_index = stop * signal.sampling_frequency
-                signal._digital = signal.digital[int(start_index) : int(stop_index)]
+                signal._digital = signal.digital[int(start_index) : int(stop_index)]  # type: ignore[assignment]
                 signals.append(signal)
         self._set_signals(signals)
         self._shift_startdatetime(int(start))
@@ -1058,7 +1070,7 @@ class _Base(Generic[_Signal]):
             self.startdate = startdatetime.date()
         self.starttime = startdatetime.time()
 
-    def copy(self) -> Edf | Bdf:
+    def copy(self) -> Self:
         """
         Create a deep copy of the Edf.
 
@@ -1067,7 +1079,7 @@ class _Base(Generic[_Signal]):
         Edf
             The copied Edf object.
         """
-        return copy.deepcopy(self)  # type: ignore[return-value]
+        return copy.deepcopy(self)
 
     def _slice_annotations_signal(
         self,
@@ -1079,7 +1091,7 @@ class _Base(Generic[_Signal]):
     ) -> _Signal:
         is_timekeeping_signal = signal == self._timekeeping_signal
         annotations: list[EdfAnnotation] = []
-        for data_record in signal.digital.reshape((-1, signal.samples_per_data_record)):
+        for data_record in signal.digital.reshape((-1, signal._bytes_per_data_record)):
             annot_dr = _EdfAnnotationsDataRecord.from_bytes(data_record.tobytes())
             if is_timekeeping_signal:
                 annotations.extend(annot_dr.annotations[1:])
@@ -1090,10 +1102,11 @@ class _Base(Generic[_Signal]):
             for a in annotations
             if keep_all_annotations or start <= a.onset < stop
         ]
-        return self._create_annotations_signal(
+        return _create_annotations_signal(
             annotations,
             num_data_records=self.num_data_records,
             data_record_duration=self.data_record_duration,
+            signal_class=self._signal_class,
             with_timestamps=is_timekeeping_signal,
             subsecond_offset=self._subsecond_offset + start - int(start),
         )
@@ -1147,23 +1160,6 @@ class Edf(_Base[EdfSignal]):
     def version(self) -> int:
         """EDF version, always `0`."""
         return int(decode_str(self._version))
-
-    def _create_annotations_signal(
-        self,
-        annotations: Iterable[EdfAnnotation],
-        *,
-        num_data_records: int,
-        data_record_duration: float,
-        with_timestamps: bool,
-        subsecond_offset: float,
-    ) -> EdfSignal:
-        return _create_annotations_signal(
-            annotations,
-            num_data_records=num_data_records,
-            data_record_duration=data_record_duration,
-            with_timestamps=with_timestamps,
-            subsecond_offset=subsecond_offset,
-        )
 
 
 class Bdf(_Base[BdfSignal]):
