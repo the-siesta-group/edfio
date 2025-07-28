@@ -59,7 +59,7 @@ def test_date_decode_invalid_format(date: bytes):
 
 
 def test_date_decode_invalid_day():
-    with pytest.raises(ValueError, match="day is out of range for month"):
+    with pytest.raises(ValueError, match="day is out of range|day 32 must be in range"):
         decode_date(b"32.08.51")
 
 
