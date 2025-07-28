@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import math
+import sys
 import warnings
-from typing import Callable, Literal, NamedTuple
+from typing import Callable, ClassVar, Generic, Literal, NamedTuple
 
 import numpy as np
 import numpy.typing as npt
@@ -14,7 +15,13 @@ from edfio._header_field import (
     encode_int,
     encode_str,
 )
-from edfio._lazy_loading import LazyLoader
+from edfio._lazy_loading import LazyLoader, _DigitalDtype
+
+if sys.version_info < (3, 11):  # pragma: no cover
+    from typing_extensions import Self
+else:  # pragma: no cover
+    from typing import Self
+
 
 _EDF_DEFAULT_RANGE = (-32768, 32767)
 _BDF_DEFAULT_RANGE = (-8388608, 8388607)
@@ -55,7 +62,7 @@ def _calculate_gain_and_offset(
     return gain, offset
 
 
-class _BaseSignal:
+class _BaseSignal(Generic[_DigitalDtype]):
     _header_fields = (
         ("label", 16),
         ("transducer_type", 80),
@@ -68,9 +75,12 @@ class _BaseSignal:
         ("samples_per_data_record", 8),
         ("reserved", 32),
     )
-    _fmt: Literal["edf", "bdf"] = "edf"
-    _digital: npt.NDArray[np.int16 | np.int32] | None = None
-    _lazy_loader: LazyLoader | None = None
+    _digital_dtype: type[_DigitalDtype]
+    _fmt: ClassVar[Literal["EDF", "BDF"]]
+    _default_digital_range: ClassVar[tuple[int, int]]
+    _bytes_per_sample: ClassVar[Literal[2, 3]]
+    _digital: npt.NDArray[_DigitalDtype] | None = None
+    _lazy_loader: LazyLoader[_DigitalDtype] | None = None
 
     def __init__(
         self,
@@ -103,10 +113,6 @@ class _BaseSignal:
             info = f"{self.label} " + info
         return f"<{self.__class__.__name__} {info}>"
 
-    @property
-    def _fmt_pretty(self) -> str:
-        return self._fmt.upper()
-
     @classmethod
     def _from_raw_header(
         cls,
@@ -123,7 +129,7 @@ class _BaseSignal:
         samples_per_data_record: bytes,
         reserved: bytes,
         header_encoding: str = "ascii",
-    ) -> EdfSignal | BdfSignal:
+    ) -> Self:
         sig = object.__new__(cls)
         sig._sampling_frequency = sampling_frequency
         sig._label = label
@@ -137,7 +143,7 @@ class _BaseSignal:
         sig._samples_per_data_record = samples_per_data_record
         sig._reserved = reserved
         sig._header_encoding = header_encoding
-        return sig  # type: ignore[return-value]
+        return sig
 
     @classmethod
     def from_hypnogram(
@@ -146,7 +152,7 @@ class _BaseSignal:
         stage_duration: float = 30,
         *,
         label: str = "",
-    ) -> EdfSignal:
+    ) -> Self:
         """Create an EDF signal from a hypnogram, with scaling according to EDF specs.
 
         According to the EDF FAQ [1]_, use integer numbers 0, 1, 2, 3, 4, 5, 6, and 9
@@ -175,7 +181,7 @@ class _BaseSignal:
         allowed_stages = {0, 1, 2, 3, 4, 5, 6, 9}
         if invalid_stages := set(stages) - allowed_stages:
             raise ValueError(f"stages contains invalid values: {invalid_stages}")
-        return EdfSignal(
+        return cls(
             data=stages,
             sampling_frequency=1 / stage_duration,
             label=label,
@@ -190,14 +196,24 @@ class _BaseSignal:
         self._reserved = encode_str(reserved, 32)
 
     @property
+    def _annsig_label(self) -> str:
+        return f"{self._fmt} Annotations"
+
+    @property
+    def _is_annotation_signal(self) -> bool:
+        return self.label == self._annsig_label
+
+    @property
     def label(self) -> str:
         """Signal label, e.g., `"EEG Fpz-Cz"` or `"Body temp"`."""
         return decode_str(self._label, self._header_encoding)
 
     @label.setter
     def label(self, label: str) -> None:
-        if label == "EDF Annotations":
-            raise ValueError("Ordinary signal label must not be 'EDF Annotations'.")
+        if label == self._annsig_label:
+            raise ValueError(
+                f"Ordinary signal label must not be '{self._annsig_label}'."
+            )
         self._label = encode_str(label, 16)
 
     @property
@@ -291,6 +307,8 @@ class _BaseSignal:
                 raise ValueError("Signal data not set")
             self._digital = self._lazy_loader.load()
             self._lazy_loader = None
+        if self._is_annotation_signal:
+            return self._digital.view(np.uint8)
         return self._digital
 
     def _calibrate(
@@ -354,9 +372,12 @@ class _BaseSignal:
         start_index = round(start_second * self.sampling_frequency)
         end_index = round(stop_second * self.sampling_frequency)
         if self._digital is not None:
-            if end_index > len(self._digital):
+            if self._is_annotation_signal:
+                start_index *= self._bytes_per_sample
+                end_index *= self._bytes_per_sample
+            if end_index > len(self.digital):
                 raise ValueError("Invalid slice: Slice exceeds EDF duration")
-            return self._digital[start_index:end_index]
+            return self.digital[start_index:end_index]
         if self._lazy_loader is None:
             raise ValueError("Signal data not set")
         first_data_record = start_index // self.samples_per_data_record
@@ -364,9 +385,12 @@ class _BaseSignal:
         digital_portion = self._lazy_loader.load(first_data_record, last_data_record)
         offset_within_first_record = start_index % self.samples_per_data_record
         num_samples = end_index - start_index
-        return digital_portion[
+        digital_portion = digital_portion[
             offset_within_first_record : offset_within_first_record + num_samples
         ]
+        if self._is_annotation_signal:
+            return digital_portion.view(np.uint8)
+        return digital_portion
 
     def get_data_slice(
         self, start_second: float, stop_second: float
@@ -480,11 +504,21 @@ class _BaseSignal:
             self.physical_min,
             self.physical_max,
         )
-        dtype = np.int32 if self._fmt == "bdf" else np.int16
-        self._digital = np.round(data / gain - offset).astype(dtype)
+        self._digital = np.round(data / gain - offset).astype(self._digital_dtype)
+
+    @property
+    def _num_samples(self) -> int:
+        len_digital = len(self.digital)
+        if self._is_annotation_signal:
+            return len_digital // self._bytes_per_sample
+        return len_digital
+
+    @property
+    def _bytes_per_data_record(self) -> int:
+        return self.samples_per_data_record * self._bytes_per_sample
 
 
-class EdfSignal(_BaseSignal):
+class EdfSignal(_BaseSignal[np.int16]):
     """A single EDF signal.
 
     Attributes that might break the signal or file on modification (i.e.,
@@ -518,7 +552,10 @@ class EdfSignal(_BaseSignal):
         The signal prefiltering, e.g., `"HP:0.1Hz LP:75Hz"`.
     """
 
-    _fmt = "edf"
+    _digital_dtype = np.int16
+    _fmt = "EDF"
+    _default_digital_range = _EDF_DEFAULT_RANGE
+    _bytes_per_sample = 2
 
     def __init__(
         self,
@@ -544,7 +581,7 @@ class EdfSignal(_BaseSignal):
         )
 
 
-class BdfSignal(_BaseSignal):
+class BdfSignal(_BaseSignal[np.int32]):
     """A single BDF signal.
 
     See :class:`EdfSignal` for details on the parameters and attributes.
@@ -554,7 +591,10 @@ class BdfSignal(_BaseSignal):
         The default for ``digital_range`` (and the supported depth) thus differs.
     """
 
-    _fmt = "bdf"
+    _digital_dtype = np.int32
+    _fmt = "BDF"
+    _default_digital_range = _BDF_DEFAULT_RANGE
+    _bytes_per_sample = 3
 
     def __init__(
         self,

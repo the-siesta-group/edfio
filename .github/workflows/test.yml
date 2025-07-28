@@ -35,7 +35,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.9", "3.10", "3.11", "3.12", "3.13"]
+        python-version: ["3.9", "3.10", "3.11", "3.12", "3.13", "3.14"]
         numpy: ["numpy"]
         include:
           - python-version: "3.9"
@@ -48,6 +48,8 @@ jobs:
             numpy: numpy==1.26.0
           - python-version: "3.13"
             numpy: numpy==2.1.0
+          - python-version: "3.14"
+            numpy: numpy==2.3.2
     steps:
       - uses: actions/checkout@v4
         with:

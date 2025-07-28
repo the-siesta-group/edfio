@@ -1,4 +1,4 @@
-from edfio.edf import Bdf, Edf, read_edf
+from edfio.edf import Bdf, Edf, read_bdf, read_edf
 from edfio.edf_annotations import EdfAnnotation
 from edfio.edf_header import AnonymizedDateError, Patient, Recording
 from edfio.edf_signal import BdfSignal, EdfSignal
@@ -20,5 +20,6 @@ __all__ = [
     "EdfSignal",
     "Patient",
     "Recording",
+    "read_bdf",
     "read_edf",
 ]

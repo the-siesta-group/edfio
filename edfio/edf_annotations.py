@@ -1,18 +1,14 @@
 from __future__ import annotations
 
+import math
 import re
 from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Any, Literal, NamedTuple
+from typing import Any, NamedTuple, TypeVar, Union
 
 import numpy as np
 
-from edfio.edf_signal import (
-    _BDF_DEFAULT_RANGE,
-    _EDF_DEFAULT_RANGE,
-    BdfSignal,
-    EdfSignal,
-)
+from edfio.edf_signal import BdfSignal, EdfSignal
 
 _ANNOTATIONS_PATTERN = re.compile(
     """
@@ -72,15 +68,19 @@ class EdfAnnotation(NamedTuple):
         )
 
 
+_Signal = TypeVar("_Signal", bound=Union[EdfSignal, BdfSignal])
+
+
 def _create_annotations_signal(
     annotations: Iterable[EdfAnnotation],
     *,
     num_data_records: int,
     data_record_duration: float,
+    signal_class: type[_Signal],
     with_timestamps: bool = True,
     subsecond_offset: float = 0,
-    fmt: Literal["edf", "bdf"] = "edf",
-) -> EdfSignal | BdfSignal:
+) -> _Signal:
+    bytes_per_sample = signal_class._bytes_per_sample
     data_record_starts = np.arange(num_data_records) * data_record_duration
     # list.pop() is O(1) and list.pop(0) is O(n), so using a reversed list is faster
     annotations = sorted(annotations, reverse=True)
@@ -103,26 +103,18 @@ def _create_annotations_signal(
             )
         data_records.append(_EdfAnnotationsDataRecord(tals).to_bytes())
     maxlen = max(len(data_record) for data_record in data_records)
-    if maxlen % 2:
-        maxlen += 1
+    maxlen = math.ceil(maxlen / bytes_per_sample) * bytes_per_sample
     raw = b"".join(dr.ljust(maxlen, b"\x00") for dr in data_records)
     divisor = data_record_duration if data_record_duration else 1
-    klass: type[EdfSignal | BdfSignal]
-    if fmt == "edf":
-        klass = EdfSignal
-        physical_range = _EDF_DEFAULT_RANGE
-    else:
-        klass = BdfSignal
-        physical_range = _BDF_DEFAULT_RANGE
-    signal = klass(
+    signal = signal_class(
         np.arange(1.0),  # placeholder signal, as argument `data` is non-optional
-        sampling_frequency=maxlen // 2 / divisor,
-        physical_range=physical_range,
+        sampling_frequency=maxlen // bytes_per_sample / divisor,
+        physical_range=signal_class._default_digital_range,
     )
-    signal._label = b"EDF Annotations "
-    signal._set_samples_per_data_record(maxlen // 2)
-    signal._digital = np.frombuffer(raw, dtype=np.int16).copy()
-    return signal
+    signal._label = f"{signal_class._fmt} Annotations ".encode()
+    signal._set_samples_per_data_record(maxlen // bytes_per_sample)
+    signal._digital = np.frombuffer(raw, dtype=np.uint8).copy()  # type: ignore[assignment]
+    return signal  # type: ignore[return-value]
 
 
 @dataclass
