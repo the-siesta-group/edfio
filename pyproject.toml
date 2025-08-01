@@ -98,3 +98,7 @@ ban-relative-imports = "all"
 
 [tool.ruff.lint.pydocstyle]
 convention = "numpy"
+
+[tool.coverage.run]
+source_dirs = ["edfio", "tests"]
+omit = ["tests/generate_test_data.py"]
