@@ -29,6 +29,9 @@ EDF_FILE = TEST_DATA_DIR / "short_psg.edf"
 EDF_SIGNAL_REFERENCE_FILE = TEST_DATA_DIR / "short_psg_header_reference.json"
 
 
+# no idea why, but doing this here once works, but adding it to pytest.ini_options in
+# pyproject.toml does not
+@pytest.mark.filterwarnings("ignore:The distutils.*:DeprecationWarning")
 def test_read_edf():
     edf = read_edf(EDF_FILE)
 
