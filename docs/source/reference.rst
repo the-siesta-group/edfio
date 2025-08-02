@@ -8,6 +8,8 @@ API reference
    :nosignatures:
 
    read_edf
+   Bdf
+   BdfSignal
    Edf
    EdfSignal
    EdfAnnotation

@@ -6,6 +6,9 @@ on:
       - 'docs/**'
       - '**/*.md'
   workflow_call:
+  pull_request:
+    branches:
+      - main
 
 jobs:
   pre-commit:
