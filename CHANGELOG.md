@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+### Fixed
+- Changing the microsecond part of an EDF+C with multiple annotation signals now correctly updates all annotation onsets ([#63](https://github.com/the-siesta-group/edfio/pull/63)).
+
 ## [0.4.9] - 2025-05-19
 
 ### Fixed

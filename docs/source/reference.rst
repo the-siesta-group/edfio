@@ -7,7 +7,10 @@ API reference
    :toctree: generated
    :nosignatures:
 
+   read_bdf
    read_edf
+   Bdf
+   BdfSignal
    Edf
    EdfSignal
    EdfAnnotation
