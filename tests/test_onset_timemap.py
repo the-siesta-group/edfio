@@ -1,14 +1,13 @@
 """Tests for EDF+D onset time map functionality."""
 
 import datetime
-import tempfile
 from pathlib import Path
 
 import numpy as np
 import pytest
 
 import edfio
-from edfio import Edf, EdfSignal, EdfAnnotation
+from edfio import Edf, EdfAnnotation, EdfSignal
 
 
 class TestOnsetTimeMap:
@@ -34,6 +33,7 @@ class TestOnsetTimeMap:
 
         # Provide proper recording info
         from edfio.edf_header import Recording
+
         recording = Recording(startdate=datetime.date(2023, 1, 1))
 
         edf = Edf(
@@ -58,7 +58,9 @@ class TestOnsetTimeMap:
         )
         edf = Edf([signal])
 
-        with pytest.raises(ValueError, match="only available for discontinuous EDF\\+D"):
+        with pytest.raises(
+            ValueError, match="only available for discontinuous EDF\\+D"
+        ):
             edf.get_datarecord_relative_onset_times()
 
     def test_get_datarecord_onset_datetimes_error_on_non_discontinuous(self):
@@ -69,13 +71,16 @@ class TestOnsetTimeMap:
             sampling_frequency=250,
             label="Test Signal",
         )
-        
+
         # Provide proper recording info to avoid AnonymizedDateError
         from edfio.edf_header import Recording
+
         recording = Recording(startdate=datetime.date(2023, 1, 1))
         edf = Edf([signal], recording=recording)
 
-        with pytest.raises(ValueError, match="only available for discontinuous EDF\\+D"):
+        with pytest.raises(
+            ValueError, match="only available for discontinuous EDF\\+D"
+        ):
             edf.get_datarecord_onset_datetimes()
 
     def test_get_datarecord_discontinuity_indices_error_on_non_discontinuous(self):
@@ -88,7 +93,9 @@ class TestOnsetTimeMap:
         )
         edf = Edf([signal])
 
-        with pytest.raises(ValueError, match="only available for discontinuous EDF\\+D"):
+        with pytest.raises(
+            ValueError, match="only available for discontinuous EDF\\+D"
+        ):
             edf.get_datarecord_discontinuity_indices()
 
     def test_caching_behavior(self, mock_edf_plus_d):
@@ -161,14 +168,16 @@ class TestOnsetTimeMap:
         )
 
         for rel_time, abs_time in zip(rel_times, abs_times):
-            expected_abs_time = start_datetime + datetime.timedelta(seconds=float(rel_time))
+            expected_abs_time = start_datetime + datetime.timedelta(
+                seconds=float(rel_time)
+            )
             # Allow small floating point differences
             time_diff = abs((abs_time - expected_abs_time).total_seconds())
             assert time_diff < 1e-6
 
     @pytest.mark.skipif(
         not Path("/home/clee/code/python-edf/tests/edf+D_sample.edf").exists(),
-        reason="Test EDF+D file not available"
+        reason="Test EDF+D file not available",
     )
     def test_with_real_edf_plus_d_file(self):
         """Test with a real EDF+D file if available."""
@@ -201,6 +210,7 @@ class TestOnsetTimeMap:
 
         # Test caching performance
         import time
+
         start = time.time()
         rel_times_1 = edf.get_datarecord_relative_onset_times()
         first_call_time = time.time() - start
@@ -223,24 +233,25 @@ class TestOnsetTimeMap:
             sampling_frequency=250,
             label="Test Signal",
         )
-        
+
         from edfio.edf_header import Recording
+
         recording = Recording(startdate=datetime.date(2023, 1, 1))
         edf = Edf([signal], recording=recording)
-        
+
         # Mock the relative onset computation to return a large array
         large_array = np.arange(150_000, dtype=np.float64)  # Over cache threshold
-        
+
         def mock_compute():
             return large_array
-        
+
         # Make it appear discontinuous and mock the computation
         edf._set_reserved("EDF+D")
         edf._compute_relative_onset_times = mock_compute
 
         # Call with caching enabled
         result = edf.get_datarecord_relative_onset_times(use_cache=True)
-        
+
         # Should not cache due to size
         assert edf._cached_onset_times is None
         np.testing.assert_array_equal(result, large_array)
@@ -251,7 +262,7 @@ class TestAsyncOnsetTimeMap:
 
     @pytest.mark.skipif(
         not Path("/home/clee/code/python-edf/tests/edf+D_sample.edf").exists(),
-        reason="Test EDF+D file not available"
+        reason="Test EDF+D file not available",
     )
     def test_async_onset_time_map(self):
         """Test async computation of onset time map."""
@@ -276,7 +287,7 @@ class TestAsyncOnsetTimeMap:
         # Test context manager
         with edfio.EdfAsyncProcessor(edf) as proc:
             assert proc._executor is not None
-        
+
         # Executor should be shut down after context exit
         # Note: We can't directly test this without accessing private members
         # but the context manager should handle cleanup
