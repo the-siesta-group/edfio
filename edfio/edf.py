@@ -560,8 +560,32 @@ class Edf:
 
     @property
     def reserved(self) -> str:
-        """`"EDF+C"` for an EDF+C file, else `""`."""
+        """Reserved field for EDF files.  EDF+ file uses first 5 bytes of this
+        field to contain 'EDF+C' or 'EDF+D' for EDF+ files, else empty/spaces.
+
+        """
         return decode_str(self._reserved)
+
+    @property
+    def edf_format(self) -> Literal["EDF", "EDF+C", "EDF+D"]:
+        """The EDF format variant: 'EDF', 'EDF+C', or 'EDF+D'."""
+        reserved_start = decode_str(self._reserved[:5]).strip()
+        if reserved_start == "EDF+C":
+            return "EDF+C"
+        elif reserved_start == "EDF+D":
+            return "EDF+D"
+        else:
+            return "EDF"
+
+    @property
+    def is_edf_plus(self) -> bool:
+        """True if this is an EDF+ file (EDF+C or EDF+D)."""
+        return self.edf_format in ("EDF+C", "EDF+D")
+
+    @property
+    def is_discontinuous(self) -> bool:
+        """True if this is a discontinuous EDF+D file."""
+        return self.edf_format == "EDF+D"
 
     @property
     def num_data_records(self) -> int:

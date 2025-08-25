@@ -1237,6 +1237,57 @@ def test_create_edf_with_many_annotations():
     assert edf is not None
 
 
+def test_edf_format_plain_edf():
+    """Test edf_format property for plain EDF file."""
+    edf = Edf([EdfSignal(np.arange(10), 1)])
+    assert edf.edf_format == "EDF"
+    assert not edf.is_edf_plus
+    assert not edf.is_discontinuous
+
+
+def test_edf_format_edf_plus_c():
+    """Test edf_format property for EDF+C file."""
+    edf = Edf(
+        [EdfSignal(np.arange(10), 1)], annotations=[EdfAnnotation(0, None, "test")]
+    )
+    assert edf.edf_format == "EDF+C"
+    assert edf.is_edf_plus
+    assert not edf.is_discontinuous
+
+
+def test_edf_format_edf_plus_d():
+    """Test edf_format property for EDF+D file."""
+    edf = Edf([EdfSignal(np.arange(10), 1)])
+    # Manually set reserved field to EDF+D to test detection
+    edf._reserved = b"EDF+D".ljust(44)
+    assert edf.edf_format == "EDF+D"
+    assert edf.is_edf_plus
+    assert edf.is_discontinuous
+
+
+def test_edf_format_with_exact_bytes():
+    """Test edf_format property with exact EDF+ identifier in first 5 bytes."""
+    edf = Edf([EdfSignal(np.arange(10), 1)])
+    # Test with EDF+C exactly in first 5 bytes (bytes [192,197) in EDF header)
+    edf._reserved = b"EDF+C" + b" " * 39
+    assert edf.edf_format == "EDF+C"
+    assert edf.is_edf_plus
+
+    # Test with EDF+D exactly in first 5 bytes
+    edf._reserved = b"EDF+D" + b" " * 39
+    assert edf.edf_format == "EDF+D"
+    assert edf.is_edf_plus
+
+
+def test_edf_format_unknown_reserved():
+    """Test edf_format property with unknown reserved field content."""
+    edf = Edf([EdfSignal(np.arange(10), 1)])
+    # Set some other content in reserved field
+    edf._reserved = b"UNKNOWN".ljust(44)
+    assert edf.edf_format == "EDF"
+    assert not edf.is_edf_plus
+
+
 def test_read_edf_with_latin_1_encoded_header_fields(tmp_file: Path):
     signal = EdfSignal(np.arange(10), 1)
     signal._label = "Posição".encode("latin-1").ljust(16)
