@@ -53,7 +53,7 @@ class EdfAsyncProcessor:
         >>> # Do other work while computation runs...
         >>> time_map = future.result()  # Get the result when ready
         """
-        return self._executor.submit(self._edf.get_onset_time_map)
+        return self._executor.submit(self._edf.get_datarecord_onset_datetimes)
 
     def shutdown(self) -> None:
         """Shutdown the thread pool executor."""

@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import Any, Literal
 
 import numpy as np
+from numpy.typing import NDArray
 
 from edfio._header_field import (
     decode_date,
@@ -94,6 +95,7 @@ class Edf:
         ("num_signals", 4),
     )
     _signals: tuple[EdfSignal, ...]
+    _cached_onset_times: NDArray[np.float64] | None
 
     def __init__(
         self,
@@ -143,6 +145,7 @@ class Edf:
             self._set_reserved("EDF+C")
         self._set_signals(signals)
         self._header_encoding = "ascii"
+        self._cached_onset_times = None
 
     def __repr__(self) -> str:
         signals_text = f"{len(self.signals)} signal"
@@ -164,9 +167,11 @@ class Edf:
 
     def _set_num_data_records(self, num_data_records: int) -> None:
         self._num_data_records = encode_int(num_data_records, 8)
+        self._invalidate_onset_cache()
 
     def _set_data_record_duration(self, data_record_duration: float) -> None:
         self._data_record_duration = encode_float(data_record_duration)
+        self._invalidate_onset_cache()
 
     def _set_num_signals(self, num_signals: int) -> None:
         self._num_signals = encode_int(num_signals, 4)
@@ -259,6 +264,7 @@ class Edf:
         header_encoding: str,
     ) -> None:
         self._header_encoding = header_encoding
+        self._cached_onset_times = None
         for header_name, length in Edf._header_fields:
             setattr(self, "_" + header_name, buffer.read(length))
         self._signals = self._parse_signal_headers(
@@ -284,6 +290,7 @@ class Edf:
         self._set_num_signals(len(signals))
         if all(s.label == "EDF Annotations" for s in signals):
             self._set_data_record_duration(0)
+        self._invalidate_onset_cache()
 
     def _set_num_data_records_with_signals(
         self,
@@ -337,6 +344,8 @@ class Edf:
             except ZeroDivisionError:
                 if raw_signal_header["label"].rstrip() == b"EDF Annotations":
                     sampling_frequency = 0
+                else:
+                    raise
             signals.append(
                 EdfSignal._from_raw_header(
                     sampling_frequency,
@@ -1077,12 +1086,12 @@ class Edf:
         """
         return copy.deepcopy(self)
 
-    def get_onset_time_map(self) -> list[datetime.datetime]:
+    def get_datarecord_onset_datetimes(self) -> list[datetime.datetime]:
         """
-        Get onset time map for EDF+D discontinuous files.
+        Get data record onset datetimes for EDF+D discontinuous files.
 
-        This method extracts the onset times from the timekeeping annotation signal
-        and returns the absolute datetime for each data record onset. This is
+        This method extracts the relative onset times from the timekeeping annotation signal
+        and returns them as absolute datetime objects for each data record onset. This is
         particularly useful for EDF+D files where data records may not be
         temporally contiguous.
 
@@ -1091,6 +1100,36 @@ class Edf:
         list[datetime.datetime]
             List of datetime objects representing the absolute time of each
             data record onset.
+
+        """
+        # Calculate starting datetime
+        start_datetime = datetime.datetime.combine(self.startdate, self.starttime)
+        # Convert relative onset times to absolute datetimes
+        onset_times = self.get_datarecord_relative_onset_times()
+        return [
+            start_datetime + datetime.timedelta(seconds=onset_time)
+            for onset_time in onset_times
+        ]
+
+    def get_datarecord_relative_onset_times(
+        self, *, use_cache: bool = True
+    ) -> NDArray[np.float64]:
+        """
+        Get relative onset times for EDF+D discontinuous files.
+
+        This method extracts the relative onset times from the timekeeping annotation signal.
+        Results are cached for performance on subsequent calls unless disabled.
+
+        Parameters
+        ----------
+        use_cache : bool, default: True
+            If True, uses cached results if available and caches new results.
+            If False, always recalculates from the raw data.
+
+        Returns
+        -------
+        NDArray[np.float64]
+            Array of relative onset times in seconds from the recording start.
 
         Raises
         ------
@@ -1101,9 +1140,39 @@ class Edf:
         --------
         >>> import edfio
         >>> edf = edfio.read_edf("discontinuous.edf")
-        >>> time_map = edf.get_onset_time_map()
-        >>> print(f"First data record starts at: {time_map[0]}")
-        >>> print(f"Last data record starts at: {time_map[-1]}")
+        >>> onset_times = edf.get_relative_onset_times()
+        >>> print(f"First onset at: {onset_times[0]} seconds")
+        """
+        if use_cache and self._cached_onset_times is not None:
+            return self._cached_onset_times
+
+        onset_times = self._compute_relative_onset_times()
+
+        if use_cache:
+            # Cache results if the number of data records is reasonable
+            # Avoid caching for very large files to prevent memory issues
+            cache_threshold = 100_000
+            if len(onset_times) < cache_threshold:
+                self._cached_onset_times = onset_times
+
+        return onset_times
+
+    def _compute_relative_onset_times(self) -> NDArray[np.float64]:
+        """
+        Compute relative onset times from the timekeeping annotation signal.
+
+        This is the core computation method that extracts onset times from the
+        EDF+D TAL (Time-stamped Annotation List) format.
+
+        Returns
+        -------
+        NDArray[np.float64]
+            Array of relative onset times in seconds from the recording start.
+
+        Raises
+        ------
+        ValueError
+            If the EDF file is not discontinuous (EDF+D) or lacks annotation signals.
         """
         if not self.is_discontinuous:
             raise ValueError(
@@ -1114,9 +1183,6 @@ class Edf:
             timekeeping_signal = self._timekeeping_signal
         except StopIteration as err:
             raise ValueError("No timekeeping signal found in EDF file") from err
-
-        # Calculate starting datetime
-        start_datetime = datetime.datetime.combine(self.startdate, self.starttime)
 
         # Extract onset times from the timekeeping signal
         onset_times = []
@@ -1142,11 +1208,48 @@ class Edf:
             except (ValueError, UnicodeDecodeError):
                 continue
 
-        # Convert relative onset times to absolute datetimes
-        return [
-            start_datetime + datetime.timedelta(seconds=onset_time)
-            for onset_time in onset_times
-        ]
+        return np.array(onset_times, dtype=np.float64)
+
+    def get_datarecord_discontinuity_indices(self) -> NDArray[np.int64]:
+        """
+        Find data record indices where discontinuities occur in EDF+D files.
+
+        This method analyzes the relative onset times to identify where temporal
+        discontinuities occur (i.e., gaps larger than the expected data record duration).
+        Uses the approach from the example code with np.diff and np.where.
+
+        Returns
+        -------
+        NDArray[np.int64]
+            Array of data record indices where discontinuities occur.
+            These are indices into the data record array where a temporal jump happens.
+
+        Raises
+        ------
+        ValueError
+            If the EDF file is not discontinuous (EDF+D) or lacks annotation signals.
+
+        Examples
+        --------
+        >>> import edfio
+        >>> edf = edfio.read_edf("discontinuous.edf")
+        >>> disc_indices = edf.get_datarecord_discontinuity_indices()
+        >>> print(f"Discontinuities at data records: {disc_indices}")
+        """
+        relative_times = self.get_datarecord_relative_onset_times()
+
+        # Calculate differences between consecutive onset times
+        time_diffs = np.diff(relative_times)
+
+        # Find where differences are significantly larger than expected
+        # Use data_record_duration + small tolerance as threshold
+        threshold = self.data_record_duration * 1.1  # 10% tolerance
+        return np.where(time_diffs > threshold)[0]
+
+    def _invalidate_onset_cache(self) -> None:
+        """Invalidate the cached onset times when EDF structure changes."""
+        if hasattr(self, "_cached_onset_times"):
+            self._cached_onset_times = None
 
     def _slice_annotations_signal(
         self,
