@@ -560,9 +560,11 @@ class Edf:
 
     @property
     def reserved(self) -> str:
-        """Reserved field for EDF files.  EDF+ file uses first 5 bytes of this
-        field to contain 'EDF+C' or 'EDF+D' for EDF+ files, else empty/spaces.
+        """Decodes to str Reserved header field for EDF files.
 
+        Used in EDF+ files: first 5 bytes of this
+        field to contain 'EDF+C' or 'EDF+D' for EDF+ files, else unused
+        empty spaces.
         """
         return decode_str(self._reserved)
 
@@ -572,10 +574,9 @@ class Edf:
         reserved_start = decode_str(self._reserved[:5]).strip()
         if reserved_start == "EDF+C":
             return "EDF+C"
-        elif reserved_start == "EDF+D":
+        if reserved_start == "EDF+D":
             return "EDF+D"
-        else:
-            return "EDF"
+        return "EDF"
 
     @property
     def is_edf_plus(self) -> bool:
@@ -1075,6 +1076,77 @@ class Edf:
             The copied Edf object.
         """
         return copy.deepcopy(self)
+
+    def get_onset_time_map(self) -> list[datetime.datetime]:
+        """
+        Get onset time map for EDF+D discontinuous files.
+
+        This method extracts the onset times from the timekeeping annotation signal
+        and returns the absolute datetime for each data record onset. This is
+        particularly useful for EDF+D files where data records may not be
+        temporally contiguous.
+
+        Returns
+        -------
+        list[datetime.datetime]
+            List of datetime objects representing the absolute time of each
+            data record onset.
+
+        Raises
+        ------
+        ValueError
+            If the EDF file is not discontinuous (EDF+D) or lacks annotation signals.
+
+        Examples
+        --------
+        >>> import edfio
+        >>> edf = edfio.read_edf("discontinuous.edf")
+        >>> time_map = edf.get_onset_time_map()
+        >>> print(f"First data record starts at: {time_map[0]}")
+        >>> print(f"Last data record starts at: {time_map[-1]}")
+        """
+        if not self.is_discontinuous:
+            raise ValueError(
+                "Onset time map is only available for discontinuous EDF+D files"
+            )
+
+        try:
+            timekeeping_signal = self._timekeeping_signal
+        except StopIteration as err:
+            raise ValueError("No timekeeping signal found in EDF file") from err
+
+        # Calculate starting datetime
+        start_datetime = datetime.datetime.combine(self.startdate, self.starttime)
+
+        # Extract onset times from the timekeeping signal
+        onset_times = []
+        for data_record in timekeeping_signal.digital.reshape(
+            (-1, timekeeping_signal.samples_per_data_record)
+        ):
+            # Convert digital data to bytes and parse the first TAL
+            tal_bytes = data_record.tobytes()
+
+            # Find the end of the onset time (marked by 0x14 byte per EDF+ TAL spec)
+            onset_end = 0
+            while onset_end < len(tal_bytes) and tal_bytes[onset_end] != 20:  # noqa: PLR2004
+                onset_end += 1
+
+            if onset_end == 0 or onset_end >= len(tal_bytes):
+                continue
+
+            try:
+                # Extract and parse the onset time
+                onset_str = tal_bytes[:onset_end].decode("ascii")
+                onset_seconds = float(onset_str)
+                onset_times.append(onset_seconds)
+            except (ValueError, UnicodeDecodeError):
+                continue
+
+        # Convert relative onset times to absolute datetimes
+        return [
+            start_datetime + datetime.timedelta(seconds=onset_time)
+            for onset_time in onset_times
+        ]
 
     def _slice_annotations_signal(
         self,

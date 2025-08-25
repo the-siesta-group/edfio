@@ -1,5 +1,6 @@
 from edfio.edf import Edf, read_edf
 from edfio.edf_annotations import EdfAnnotation
+from edfio.edf_async import EdfAsyncProcessor
 from edfio.edf_header import AnonymizedDateError, Patient, Recording
 from edfio.edf_signal import EdfSignal
 
@@ -15,6 +16,7 @@ __all__ = [
     "AnonymizedDateError",
     "Edf",
     "EdfAnnotation",
+    "EdfAsyncProcessor",
     "EdfSignal",
     "Patient",
     "Recording",
