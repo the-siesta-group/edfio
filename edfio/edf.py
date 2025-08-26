@@ -1246,6 +1246,87 @@ class Edf:
         threshold = self.data_record_duration * 1.1  # 10% tolerance
         return np.where(time_diffs > threshold)[0]
 
+    def _get_data_record_range(
+        self, start_samp: int, end_samp: int, extra_samp: int = 0
+    ) -> tuple[int, int]:
+        """
+        Get data record indices that contain the specified sample range.
+
+        This function converts a sample range [sample1 - extra, sample2 + extra)
+        to the corresponding data record indices that contain those samples.
+        Based on the algorithm from get_annotations method.
+
+        Parameters
+        ----------
+        start_samp : int
+            Start sample index (must be non-negative).
+        end_samp : int
+            End sample index (must be non-negative and >= start_samp).
+        extra_samp : int, default: 0
+            Extra samples to include before start_samp and after end_samp (must be non-negative).
+
+        Returns
+        -------
+        tuple[int, int]
+            A tuple (start_record, end_record) where:
+            - start_record: First data record index containing the range
+            - end_record: Last data record index containing the range + 1 (exclusive)
+            So data records [start_record, end_record) contain the sample range.
+
+        Raises
+        ------
+        ValueError
+            If any argument is negative or if end_samp < start_samp.
+
+        Examples
+        --------
+        >>> import edfio
+        >>> edf = edfio.read_edf("file.edf")
+        >>> # Get data records containing samples 1000-2000 with 100 sample buffer
+        >>> start_rec, end_rec = edf.get_data_record_range(1000, 2000, 100)
+        >>> print(f"Need data records {start_rec} to {end_rec-1}")
+        """
+        # Validate inputs, probably will remove these checks
+        if start_samp < 0:
+            raise ValueError("start_samp must be non-negative")
+        if end_samp < 0:
+            raise ValueError("end_samp must be non-negative")
+        if extra_samp < 0:
+            raise ValueError("extra_samp must be non-negative")
+        if end_samp < start_samp:
+            raise ValueError("end_samp must be >= start_samp")
+
+        # Get the first signal to determine sampling frequency
+        # All signals in an EDF should have consistent timing relative to data records
+        if not self.signals:
+            raise ValueError("No signals available for data record calculation")
+
+        signal = self.signals[0]
+
+        # Calculate samples per data record (may not be set for new EDF objects)
+        try:
+            samples_per_record = signal.samples_per_data_record
+        except AttributeError:
+            # For newly created EDF objects, calculate from signal data and num_data_records
+            samples_per_record = len(signal.digital) // self.num_data_records
+
+        total_samples = samples_per_record * self.num_data_records
+
+        # Calculate actual sample range with buffer
+        start_sample = max(0, start_samp - extra_samp)  # Ensure we don't go negative
+        end_sample = min(end_samp + extra_samp, total_samples)
+
+        start_record = start_sample // samples_per_record
+        end_record = math.ceil(end_sample / samples_per_record)
+
+        # Ensure we don't exceed the available data records
+        if end_record > self.num_data_records:
+            raise ValueError(
+                f"Calculated end_record ({end_record}) exceeds available data records ({self.num_data_records})"
+            )
+
+        return start_record, end_record
+
     def _invalidate_onset_cache(self) -> None:
         """Invalidate the cached onset times when EDF structure changes."""
         if hasattr(self, "_cached_onset_times"):

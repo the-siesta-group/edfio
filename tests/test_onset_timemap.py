@@ -1,6 +1,7 @@
 """Tests for EDF+D onset time map functionality."""
 
 import datetime
+import math
 from pathlib import Path
 
 import numpy as np
@@ -291,3 +292,135 @@ class TestAsyncOnsetTimeMap:
         # Executor should be shut down after context exit
         # Note: We can't directly test this without accessing private members
         # but the context manager should handle cleanup
+
+
+class TestDataRecordRange:
+    """Test suite for data record range functionality."""
+
+    def test_get_data_record_range_basic(self):
+        """Test basic data record range calculation."""
+        # Create a simple EDF for testing
+        signal_data = np.arange(1000, dtype=np.float64)  # 4 seconds at 250Hz
+        signal = EdfSignal(
+            data=signal_data,
+            sampling_frequency=250,
+            label="Test Signal",
+        )
+
+        from edfio.edf_header import Recording
+
+        recording = Recording(startdate=datetime.date(2023, 1, 1))
+        edf = Edf(
+            [signal], recording=recording, data_record_duration=1.0
+        )  # 1 second records
+
+        # Test basic range
+        start_rec, end_rec = edf._get_data_record_range(100, 300, 50)
+
+        # Manual calculation:
+        # Samples [50, 350) -> times [0.2s, 1.4s) -> records [0, 2)
+        expected_start = 0
+        expected_end = 2
+
+        assert start_rec == expected_start
+        assert end_rec == expected_end
+
+    def test_get_data_record_range_edge_cases(self):
+        """Test edge cases for data record range calculation."""
+        signal_data = np.arange(1000, dtype=np.float64)
+        signal = EdfSignal(
+            data=signal_data,
+            sampling_frequency=250,
+            label="Test Signal",
+        )
+
+        from edfio.edf_header import Recording
+
+        recording = Recording(startdate=datetime.date(2023, 1, 1))
+        edf = Edf([signal], recording=recording, data_record_duration=1.0)
+
+        # Test with zero extra
+        start_rec, end_rec = edf._get_data_record_range(100, 200, 0)
+        assert isinstance(start_rec, int)
+        assert isinstance(end_rec, int)
+        assert start_rec <= end_rec
+
+        # Test with start at 0
+        start_rec, end_rec = edf._get_data_record_range(0, 100, 10)
+        assert start_rec == 0
+
+        # Test with large extra that would cause negative start
+        start_rec, end_rec = edf._get_data_record_range(50, 100, 100)
+        assert start_rec == 0  # Should be clamped to 0
+
+    def test_get_data_record_range_validation(self):
+        """Test input validation for data record range calculation."""
+        signal_data = np.arange(1000, dtype=np.float64)
+        signal = EdfSignal(
+            data=signal_data,
+            sampling_frequency=250,
+            label="Test Signal",
+        )
+
+        from edfio.edf_header import Recording
+
+        recording = Recording(startdate=datetime.date(2023, 1, 1))
+        edf = Edf([signal], recording=recording)
+
+        # Test negative start_samp
+        with pytest.raises(ValueError, match="start_samp must be non-negative"):
+            edf._get_data_record_range(-1, 100, 0)
+
+        # Test negative end_samp
+        with pytest.raises(ValueError, match="end_samp must be non-negative"):
+            edf._get_data_record_range(100, -1, 0)
+
+        # Test negative extra_samp
+        with pytest.raises(ValueError, match="extra_samp must be non-negative"):
+            edf._get_data_record_range(100, 200, -1)
+
+        # Test end_samp < start_samp
+        with pytest.raises(ValueError, match="end_samp must be >= start_samp"):
+            edf._get_data_record_range(200, 100, 0)
+
+    def test_get_data_record_range_no_signals(self):
+        """Test error handling when EDF has no signals."""
+        # Create EDF with only annotations
+        annotations = [EdfAnnotation(0.0, None, "Start")]
+        edf = Edf([], annotations=annotations)
+
+        with pytest.raises(ValueError, match="No signals available"):
+            edf._get_data_record_range(0, 100, 0)
+
+    @pytest.mark.skipif(
+        not Path("/home/clee/code/python-edf/tests/edf+D_sample.edf").exists(),
+        reason="Test EDF+D file not available",
+    )
+    def test_get_data_record_range_real_file(self):
+        """Test data record range calculation with real EDF file."""
+        test_file = Path("/home/clee/code/python-edf/tests/edf+D_sample.edf")
+        edf = edfio.read_edf(test_file)
+
+        signal = edf.signals[0]
+        fs = signal.sampling_frequency
+
+        # Test a reasonable range
+        sample1, sample2 = 1000, 2000
+        extra = 100
+
+        start_rec, end_rec = edf._get_data_record_range(sample1, sample2, extra)
+
+        # Verify the result makes sense
+        assert isinstance(start_rec, int)
+        assert isinstance(end_rec, int)
+        assert 0 <= start_rec < end_rec <= edf.num_data_records
+
+        # Manual verification
+        start_time = (sample1 - extra) / fs
+        end_time = (sample2 + extra) / fs
+        expected_start = int(start_time // edf.data_record_duration)
+        expected_end = int(math.ceil(end_time / edf.data_record_duration - 1e-12))
+        expected_end = min(expected_end, edf.num_data_records)
+
+        assert start_rec == expected_start
+        assert end_rec == expected_end
