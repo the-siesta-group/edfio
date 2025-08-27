@@ -33,7 +33,7 @@ class TestOnsetTimeMap:
         ]
 
         # Provide proper recording info
-        from edfio.edf_header import Recording
+        from edfio.edf_header import Recording  # noqa PLC0415  # allow imports inside of tests
 
         recording = Recording(startdate=datetime.date(2023, 1, 1))
 
@@ -74,7 +74,9 @@ class TestOnsetTimeMap:
         )
 
         # Provide proper recording info to avoid AnonymizedDateError
-        from edfio.edf_header import Recording
+        from edfio.edf_header import (  # noqa: PLC0415  # allow imports inside of tests
+            Recording,
+        )
 
         recording = Recording(startdate=datetime.date(2023, 1, 1))
         edf = Edf([signal], recording=recording)
@@ -210,7 +212,7 @@ class TestOnsetTimeMap:
                 assert time_diffs[idx] > edf.data_record_duration * 1.1
 
         # Test caching performance
-        import time
+        import time  # noqa: PLC0415
 
         start = time.time()
         rel_times_1 = edf.get_datarecord_relative_onset_times()
@@ -235,7 +237,7 @@ class TestOnsetTimeMap:
             label="Test Signal",
         )
 
-        from edfio.edf_header import Recording
+        from edfio.edf_header import Recording  # noqa: PLC0415
 
         recording = Recording(startdate=datetime.date(2023, 1, 1))
         edf = Edf([signal], recording=recording)
@@ -307,7 +309,7 @@ class TestDataRecordRange:
             label="Test Signal",
         )
 
-        from edfio.edf_header import Recording
+        from edfio.edf_header import Recording  # noqa: PLC0415
 
         recording = Recording(startdate=datetime.date(2023, 1, 1))
         edf = Edf(
@@ -334,7 +336,7 @@ class TestDataRecordRange:
             label="Test Signal",
         )
 
-        from edfio.edf_header import Recording
+        from edfio.edf_header import Recording  # noqa: PLC0415
 
         recording = Recording(startdate=datetime.date(2023, 1, 1))
         edf = Edf([signal], recording=recording, data_record_duration=1.0)
@@ -362,7 +364,7 @@ class TestDataRecordRange:
             label="Test Signal",
         )
 
-        from edfio.edf_header import Recording
+        from edfio.edf_header import Recording  # noqa: PLC0415
 
         recording = Recording(startdate=datetime.date(2023, 1, 1))
         edf = Edf([signal], recording=recording)
@@ -419,7 +421,7 @@ class TestDataRecordRange:
         start_time = (sample1 - extra) / fs
         end_time = (sample2 + extra) / fs
         expected_start = int(start_time // edf.data_record_duration)
-        expected_end = int(math.ceil(end_time / edf.data_record_duration - 1e-12))
+        expected_end = math.ceil(end_time / edf.data_record_duration - 1e-12)
         expected_end = min(expected_end, edf.num_data_records)
 
         assert start_rec == expected_start
