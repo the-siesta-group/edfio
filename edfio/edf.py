@@ -1210,9 +1210,11 @@ class Edf:
 
         return np.array(onset_times, dtype=np.float64)
 
-    def get_datarecord_discontinuity_indices(self) -> NDArray[np.int64]:
+    def get_datarecord_discontinuity_indices(self) -> tuple(
+        NDArray[np.int64], NDArray[np.float64], NDArray[np.float64]
+    ):
         """
-        Find data record indices where discontinuities occur in EDF+D files.
+        Find data record indices and timejumps where discontinuities occur in EDF+D files.
 
         This method analyzes the relative onset times to identify where temporal
         discontinuities occur (i.e., gaps larger than the expected data record duration).
@@ -1220,9 +1222,15 @@ class Edf:
 
         Returns
         -------
-        NDArray[np.int64]
-            Array of data record indices where discontinuities occur.
-            These are indices into the data record array where a temporal jump happens.
+        tuple of numpy.ndarray
+            A tuple containing three arrays:
+            - indices: NDArray[np.int64]
+                Array of data record indices where discontinuities occur.
+                These are indices into the data record array where a temporal jump happens.
+            - time_jumps: NDArray[np.float64]
+                Array of times of how much the time jumps forward
+            - relative_times: NDArray[np.float64]
+                The times of the discontinuities
 
         Raises
         ------
@@ -1233,18 +1241,20 @@ class Edf:
         --------
         >>> import edfio
         >>> edf = edfio.read_edf("discontinuous.edf")
-        >>> disc_indices = edf.get_datarecord_discontinuity_indices()
+        >>> disc_indices, time_jumps, rel_times = edf.get_datarecord_discontinuity_indices()
         >>> print(f"Discontinuities at data records: {disc_indices}")
+        >>> print(f"Jump are: {time_jumps} at {rel_times")
         """
         relative_times = self.get_datarecord_relative_onset_times()
 
         # Calculate differences between consecutive onset times
-        time_diffs = np.diff(relative_times)
+        time_jumps = np.diff(relative_times)
 
         # Find where differences are significantly larger than expected
         # Use data_record_duration + small tolerance as threshold
         threshold = self.data_record_duration * 1.1  # 10% tolerance
-        return np.where(time_diffs > threshold)[0]
+        indices = np.where(time_jumps > threshold)[0]
+        return indices, time_jumps[indices], relative_times[indices]
 
     def _get_data_record_range(
         self, start_samp: int, end_samp: int, extra_samp: int = 0
