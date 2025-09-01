@@ -1193,6 +1193,9 @@ class Edf:
             tal_bytes = data_record.tobytes()
 
             # Find the end of the onset time (marked by 0x14 byte per EDF+ TAL spec)
+            # Extract and parse the datarecord TAL onset time has form "[+-](\d+(\.\d*)?|\.\d+)"
+            # ends with 0x14 0x14, probably better to use a compiled regular expression
+            # than a loop in python
             onset_end = 0
             while onset_end < len(tal_bytes) and tal_bytes[onset_end] != 20:  # noqa: PLR2004
                 onset_end += 1
@@ -1201,7 +1204,7 @@ class Edf:
                 continue
 
             try:
-                # Extract and parse the onset time
+                # Extract and parse the datarecord TAL onset time has form "[+-](\d+(\.\d*)?|\.\d+)"
                 onset_str = tal_bytes[:onset_end].decode("ascii")
                 onset_seconds = float(onset_str)
                 onset_times.append(onset_seconds)
