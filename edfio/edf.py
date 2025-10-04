@@ -479,7 +479,12 @@ class Edf:
         is preferred. Raises an `AnonymizedDateError` if the EDF+ field is anonymized
         (i.e., begins with `Startdate X`).
         """
-        legacy_startdate = decode_date(self._startdate)
+        # account for dates outside of 1985 - 2084 with .yy listed for the two digit year
+        if b"yy" in self._startdate:
+            legacy_startdate = self.recording.startdate
+        else:
+            legacy_startdate = decode_date(self._startdate)
+
         with contextlib.suppress(Exception):
             if legacy_startdate != self.recording.startdate:
                 warnings.warn(
