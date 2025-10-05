@@ -151,7 +151,10 @@ class TestOnsetTimeMap:
         assert all(isinstance(t, datetime.datetime) for t in abs_times)
 
         # Test discontinuity indices return numpy array
-        disc_indices, time_jumps, relative_times  = mock_edf_plus_d.get_datarecord_discontinuity_indices()
+
+        disc_indices, time_jumps, relative_times = (
+            mock_edf_plus_d.get_datarecord_discontinuity_indices()
+        )
         assert isinstance(disc_indices, np.ndarray)
         assert disc_indices.dtype == np.int64
         assert isinstance(time_jumps, np.ndarray)
@@ -205,7 +208,9 @@ class TestOnsetTimeMap:
         assert all(isinstance(t, datetime.datetime) for t in abs_times)
 
         # Test discontinuity detection
-        disc_indices, time_jumps, relative_times  = edf.get_datarecord_discontinuity_indices()
+        disc_indices, time_jumps, relative_times = (
+            edf.get_datarecord_discontinuity_indices()
+        )
         assert isinstance(disc_indices, np.ndarray)
         assert disc_indices.dtype == np.int64
         assert isinstance(time_jumps, np.ndarray)
