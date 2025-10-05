@@ -151,9 +151,13 @@ class TestOnsetTimeMap:
         assert all(isinstance(t, datetime.datetime) for t in abs_times)
 
         # Test discontinuity indices return numpy array
-        disc_indices = mock_edf_plus_d.get_datarecord_discontinuity_indices()
+        disc_indices, time_jumps, relative_times  = mock_edf_plus_d.get_datarecord_discontinuity_indices()
         assert isinstance(disc_indices, np.ndarray)
         assert disc_indices.dtype == np.int64
+        assert isinstance(time_jumps, np.ndarray)
+        assert time_jumps.dtype == np.float64
+        assert isinstance(relative_times, np.ndarray)
+        assert relative_times.dtype == np.float64
 
     def test_datetime_calculation_consistency(self, mock_edf_plus_d):
         """Test that datetime calculation is consistent with relative times."""
@@ -201,8 +205,13 @@ class TestOnsetTimeMap:
         assert all(isinstance(t, datetime.datetime) for t in abs_times)
 
         # Test discontinuity detection
-        disc_indices = edf.get_datarecord_discontinuity_indices()
+        disc_indices, time_jumps, relative_times  = edf.get_datarecord_discontinuity_indices()
         assert isinstance(disc_indices, np.ndarray)
+        assert disc_indices.dtype == np.int64
+        assert isinstance(time_jumps, np.ndarray)
+        assert time_jumps.dtype == np.float64
+        assert isinstance(relative_times, np.ndarray)
+        assert relative_times.dtype == np.float64
 
         # Verify discontinuities make sense
         if len(disc_indices) > 0:
