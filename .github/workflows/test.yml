@@ -14,9 +14,7 @@ jobs:
   pre-commit:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-        with:
-          lfs: true
+      - uses: actions/checkout@v5
       - uses: actions/cache@v4
         with:
           path: ~/.cache/pre-commit
@@ -51,9 +49,7 @@ jobs:
           - python-version: "3.14"
             numpy: numpy==2.3.2
     steps:
-      - uses: actions/checkout@v4
-        with:
-          lfs: true
+      - uses: actions/checkout@v5
       - name: Setup uv
         uses: astral-sh/setup-uv@v6
         with:

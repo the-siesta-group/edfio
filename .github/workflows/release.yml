@@ -14,9 +14,7 @@ jobs:
     permissions:
       id-token: write
     steps:
-      - uses: actions/checkout@v4
-        with:
-          lfs: true
+      - uses: actions/checkout@v5
       - name: Setup uv
         uses: astral-sh/setup-uv@v6
         with:
