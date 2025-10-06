@@ -16,7 +16,7 @@ It requires Python>=3.9 and NumPy>=1.22 and is available on PyPI:
 
     pip install edfio
 
-- Support for EDF and EDF+C, including annotations
+- Support for EDF, EDF+C, BDF, and BDF+C including annotations
 - Fast I/O thanks to NumPy - read and write GB-sized files in seconds
 - Fail late on read: Non-compliant header fields only raise an exception when the corresponding property is accessed.
 - Fail early on write: Trying to create a new non-compliant EDF file raises an exception.
