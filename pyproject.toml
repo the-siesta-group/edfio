@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "edfio"
-description = "Read and write EDF/EDF+ files."
+description = "Read and write EDF/EDF+C/BDF/BDF+C files."
 license = { text = "Apache-2.0" }
 authors = [
     { name = "The Siesta Group", email = "opensource@thesiestagroup.com" }
