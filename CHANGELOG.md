@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+### Added
+- Support reading and writing BDF and BDF+C files ([#63](https://github.com/the-siesta-group/edfio/pull/63)).
+
 ### Fixed
 - Changing the microsecond part of an EDF+C with multiple annotation signals now correctly updates all annotation onsets ([#63](https://github.com/the-siesta-group/edfio/pull/63)).
 
