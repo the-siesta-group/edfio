@@ -52,6 +52,7 @@ templates_path = ["_templates"]
 default_role = "code"
 
 autodoc_typehints = "none"
+autodoc_default_options = {"members": True, "inherited-members": True}
 autosummary_generate = True
 
 numpydoc_show_class_members = False
@@ -84,3 +85,18 @@ def linkcode_resolve(domain, info):  # noqa: D103
     sourcelines, startline = inspect.getsourcelines(obj)
     endline = startline + len(sourcelines) - 1
     return f"{REPOSITORY_URL}/blob/{COMMIT}/{filename}#L{startline}-L{endline}"
+
+
+def autodoc_process_docstring(app, what, name, obj, options, lines):  # noqa: D103
+    def edf_to_bdf(line):
+        line = line.replace("Edf", "Bdf")
+        line = line.replace("EDF+", "BDF+")
+        line = line.replace("See :class:`Bdf", "See :class:`Edf")
+        return line.replace("BdfAnnotation", "EdfAnnotation")
+
+    if name.startswith("edfio.Bdf"):
+        lines[:] = [edf_to_bdf(l) for l in lines]
+
+
+def setup(app):  # noqa: D103
+    app.connect("autodoc-process-docstring", autodoc_process_docstring)

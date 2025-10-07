@@ -4,8 +4,8 @@ import datetime
 import io
 import json
 import tempfile
+from contextlib import nullcontext
 from pathlib import Path
-from shutil import copyfile
 from typing import Literal
 
 import numpy as np
@@ -13,6 +13,8 @@ import pytest
 
 from edfio import (
     AnonymizedDateError,
+    Bdf,
+    BdfSignal,
     Edf,
     EdfAnnotation,
     EdfSignal,
@@ -24,6 +26,7 @@ from edfio.edf import _calculate_num_data_records
 from edfio.edf_annotations import _create_annotations_signal
 from edfio.edf_signal import _FloatRange
 from tests import TEST_DATA_DIR
+from tests.conftest import _Context
 
 EDF_FILE = TEST_DATA_DIR / "short_psg.edf"
 EDF_SIGNAL_REFERENCE_FILE = TEST_DATA_DIR / "short_psg_header_reference.json"
@@ -35,7 +38,10 @@ EDF_SIGNAL_REFERENCE_FILE = TEST_DATA_DIR / "short_psg_header_reference.json"
 def test_read_edf():
     edf = read_edf(EDF_FILE)
 
-    assert edf.version == 0
+    if edf._fmt == "EDF":
+        assert edf.version == 0
+    else:
+        assert edf.version == "�BIOSEMI"
     assert edf.local_patient_identification == "X F X Female_33yr"
     assert edf.local_recording_identification == "Startdate 24-APR-1989 X X X"
     assert edf.startdate == datetime.date(1989, 4, 24)
@@ -146,21 +152,37 @@ def test_edf_init_with_negative_data_record_duration():
         )
 
 
+@pytest.mark.edf
 @pytest.mark.parametrize(
-    ("edf", "expected"),
+    ("num_signals", "num_annotations", "expected"),
     [
-        (
-            Edf([EdfSignal(np.arange(5), 1)], annotations=[EdfAnnotation(0, 1, "A")]),
-            "<Edf 1 signal 1 annotation>",
-        ),
-        (Edf([EdfSignal(np.arange(5), 1)] * 2), "<Edf 2 signals 0 annotations>"),
-        (
-            Edf([], annotations=[EdfAnnotation(0, 1, "A")] * 2),
-            "<Edf 0 signals 2 annotations>",
-        ),
+        (1, 1, "<Edf 1 signal 1 annotation>"),
+        (2, 0, "<Edf 2 signals 0 annotations>"),
+        (0, 2, "<Edf 0 signals 2 annotations>"),
     ],
 )
-def test_edf_repr(edf: Edf, expected: str):
+def test_edf_repr(num_signals: int, num_annotations: int, expected: str):
+    edf = Edf(
+        [EdfSignal(np.arange(5), 1)] * num_signals,
+        annotations=[EdfAnnotation(0, 1, "A")] * num_annotations,
+    )
+    assert repr(edf) == expected
+
+
+@pytest.mark.bdf
+@pytest.mark.parametrize(
+    ("num_signals", "num_annotations", "expected"),
+    [
+        (1, 1, "<Bdf 1 signal 1 annotation>"),
+        (2, 0, "<Bdf 2 signals 0 annotations>"),
+        (0, 2, "<Bdf 0 signals 2 annotations>"),
+    ],
+)
+def test_bdf_repr(num_signals: int, num_annotations: int, expected: str):
+    annotations = None
+    if num_annotations > 0:
+        annotations = [EdfAnnotation(0, 1, "A")] * num_annotations
+    edf = Edf([EdfSignal(np.arange(5), 1)] * num_signals, annotations=annotations)
     assert repr(edf) == expected
 
 
@@ -178,7 +200,10 @@ def test_edf_init_all_parameters():
         data_record_duration=data_record_duration,
     )
     assert len(edf.signals) == 1
-    assert edf._version == b"0".ljust(8)
+    if edf._fmt == "EDF":
+        assert edf._version == b"0".ljust(8)
+    else:
+        assert edf._version == b"\xffBIOSEMI"
     assert edf._local_patient_identification == local_patient_identification.encode(
         "ascii"
     ).ljust(80)
@@ -248,7 +273,7 @@ def test_write_read_roundtrip_signal_tolerance(tmp_file: Path, signal_scale: flo
             sine(1, 5, 3000) * signal_scale,
             sampling_frequency=30,
             physical_range=(-signal_scale, signal_scale),
-            digital_range=(-32768, 32767),
+            digital_range=_Context.digital_range,
         ),
     ]
     edf = Edf(signals)
@@ -257,7 +282,7 @@ def test_write_read_roundtrip_signal_tolerance(tmp_file: Path, signal_scale: flo
     loaded_edf = read_edf(tmp_file)
     assert len(loaded_edf.signals) == len(signals)
     for loaded_signal, reference_signal in zip(loaded_edf.signals, signals):
-        tolerance = np.ptp(reference_signal.data) * 2**-16
+        tolerance = np.ptp(reference_signal.data) * 2**-_Context.bits
         np.testing.assert_allclose(
             loaded_signal.data,
             reference_signal.data,
@@ -274,7 +299,7 @@ def test_physical_values_are_mapped_to_digital_values_with_minimal_error(
         EdfSignal(
             data=np.asarray(data, dtype="float64"),
             sampling_frequency=1,
-            physical_range=_FloatRange(-32768, 32767),  # same as digital range
+            physical_range=_FloatRange(*_Context.digital_range),
         )
     ]
     Edf(signals).write(tmp_file)
@@ -397,9 +422,9 @@ def test_read_edf_spooled_temporary_file():
         assert read_edf(file).num_signals == 7
 
 
-def test_read_edf_writable_file_raises_error(tmp_path: Path):
+def test_read_edf_writable_file_raises_error(tmp_file: Path):
     with pytest.raises(io.UnsupportedOperation, match="read"):
-        with (tmp_path / "test.edf").open("wb") as edf_file:
+        with tmp_file.open("wb") as edf_file:
             assert read_edf(edf_file)
 
 
@@ -421,8 +446,8 @@ def test_write_edf_bytes_io():
     assert stream.read() == EDF_FILE.read_bytes()
 
 
-def test_write_and_read_edf_with_non_ascii_characters_in_path(tmp_path: Path):
-    tmp_file = tmp_path / "带 Annotation 的 EDF 文件.edf"
+def test_write_and_read_edf_with_non_ascii_characters_in_path(tmp_file: Path):
+    tmp_file = tmp_file.with_stem("带 Annotation 的 EDF 文件")
     Edf([EdfSignal(np.arange(10), 1)]).write(tmp_file)
     read_edf(tmp_file)
 
@@ -514,9 +539,9 @@ def test_edf_drop_signals_works_if_signal_is_selected_by_both_index_and_label():
 def test_edf_slice_between_seconds():
     edf = Edf(
         [
-            EdfSignal(np.arange(32), 8, physical_range=(-32768, 32767)),
-            EdfSignal(np.arange(64), 16, physical_range=(-32768, 32767)),
-            EdfSignal(np.arange(1024), 256, physical_range=(-32768, 32767)),
+            EdfSignal(np.arange(32), 8, physical_range=_Context.digital_range),
+            EdfSignal(np.arange(64), 16, physical_range=_Context.digital_range),
+            EdfSignal(np.arange(1024), 256, physical_range=_Context.digital_range),
         ],
     )
     edf.slice_between_seconds(2, 3)
@@ -709,6 +734,7 @@ def test_edf_slice_between_annotations_works_for_multiple_annotation_signals():
                 ],
                 num_data_records=10,
                 data_record_duration=1,
+                signal_class=EdfSignal,
             ),
             _create_annotations_signal(
                 [
@@ -718,6 +744,7 @@ def test_edf_slice_between_annotations_works_for_multiple_annotation_signals():
                 num_data_records=10,
                 data_record_duration=1,
                 with_timestamps=False,
+                signal_class=EdfSignal,
             ),
         ],
     )
@@ -799,7 +826,7 @@ def test_edf_with_only_annotations_can_be_written(tmp_file: Path):
     Edf([], annotations=annotations).write(tmp_file)
     edf = read_edf(tmp_file)
     assert edf.bytes_in_header_record == 512
-    assert edf.reserved == "EDF+C"
+    assert edf.reserved == f"{edf._fmt}+C"
     assert edf.data_record_duration == 0
     assert edf.num_signals == 0
     assert edf._total_num_signals == 1
@@ -836,6 +863,7 @@ def test_drop_signals_keeps_position_of_annotation_signals():
                 [EdfAnnotation(0, None, "ann 1")],
                 num_data_records=2,
                 data_record_duration=1,
+                signal_class=EdfSignal,
             ),
             EdfSignal(np.arange(2), 1, label="EEG 3"),
             EdfSignal(np.arange(2), 1, label="EEG 4"),
@@ -844,14 +872,15 @@ def test_drop_signals_keeps_position_of_annotation_signals():
                 num_data_records=2,
                 data_record_duration=1,
                 with_timestamps=False,
+                signal_class=EdfSignal,
             ),
             EdfSignal(np.arange(2), 1, label="EEG 5"),
         ],
     )
     edf.drop_signals([0, 3])
     assert edf.labels == ("EEG 2", "EEG 3", "EEG 5")
-    assert edf._signals[1].label == "EDF Annotations"
-    assert edf._signals[3].label == "EDF Annotations"
+    assert edf._signals[1].label == f"{edf._fmt} Annotations"
+    assert edf._signals[3].label == f"{edf._fmt} Annotations"
     assert edf.annotations == (
         EdfAnnotation(0, None, "ann 1"),
         EdfAnnotation(0.25, None, "ann 2"),
@@ -859,16 +888,17 @@ def test_drop_signals_keeps_position_of_annotation_signals():
 
 
 @pytest.mark.parametrize(
-    "new_signal",
+    ("num_samples", "fs"),
     [
-        EdfSignal(np.arange(100), 10),
-        EdfSignal(np.arange(200), 20),
-        EdfSignal(np.arange(30), 3),
+        (1000, 100),
+        (100, 10),
+        (200, 20),
+        (30, 3),
     ],
 )
-def test_append_signals_single(new_signal: EdfSignal):
+def test_append_signals_single(num_samples: int, fs: int):
     edf = Edf([EdfSignal(np.arange(100), 10), EdfSignal(np.arange(50), 5)])
-    new_signal = EdfSignal(np.arange(1000), 100)
+    new_signal = EdfSignal(np.arange(num_samples), fs)
     edf.append_signals(new_signal)
     assert edf.num_signals == 3
     assert edf.signals[2] == new_signal
@@ -897,11 +927,19 @@ def test_append_signals_appends_after_last_ordinary_signal():
             EdfSignal(np.arange(3), 1, label="S1"),
             EdfSignal(np.arange(3), 1, label="S2"),
             _create_annotations_signal(
-                (), data_record_duration=1, num_data_records=3, with_timestamps=True
+                (),
+                data_record_duration=1,
+                signal_class=EdfSignal,
+                num_data_records=3,
+                with_timestamps=True,
             ),
             EdfSignal(np.arange(3), 1, label="S3"),
             _create_annotations_signal(
-                (), data_record_duration=1, num_data_records=3, with_timestamps=True
+                (),
+                data_record_duration=1,
+                signal_class=EdfSignal,
+                num_data_records=3,
+                with_timestamps=True,
             ),
         ]
     )
@@ -911,7 +949,8 @@ def test_append_signals_appends_after_last_ordinary_signal():
             EdfSignal(np.arange(3), 1, label="S5"),
         ]
     )
-    expected = ["S1", "S2", "EDF Annotations", "S3", "S4", "S5", "EDF Annotations"]
+    annsig_label = f"{edf._fmt} Annotations"
+    expected = ["S1", "S2", annsig_label, "S3", "S4", "S5", annsig_label]
     assert [s.label for s in edf._signals] == expected
 
 
@@ -1068,12 +1107,14 @@ def test_update_data_record_duration_with_multiple_annotations_signals(tmp_file:
             _create_annotations_signal(
                 expected_annotations1,
                 data_record_duration=1,
+                signal_class=EdfSignal,
                 num_data_records=3,
                 with_timestamps=True,
             ),
             _create_annotations_signal(
                 expected_annotations2,
                 data_record_duration=1,
+                signal_class=EdfSignal,
                 num_data_records=3,
                 with_timestamps=False,
             ),
@@ -1171,30 +1212,34 @@ def test_sampling_frequencies_leading_to_floating_point_issues_in_signal_duratio
     ("extra_bytes", "num_records_in_header", "expected_warning"),
     [
     #    extra bytes     num records field    expected warning
-        (1,              10,                  "Incomplete data record at the end of the EDF file"),
-        (15,             10,                  "Incomplete data record at the end of the EDF file"),
-        (0,              9,                   "EDF header indicates 9 data records, but file contains 10 records. Updating header."),
-        (0,              11,                  "EDF header indicates 11 data records, but file contains 10 records. Updating header."),
-        (0,              -1,                  "EDF header indicates -1 data records, but file contains 10 records. Updating header."),
+        (0,              10,                  None),
+        (1,              10,                  "Incomplete data record at the end of the [BE]DF file"),
+        (13,             10,                  "Incomplete data record at the end of the [BE]DF file"),
+        (0,              9,                   "[BE]DF header indicates 9 data records, but file contains 10 records. Updating header."),
+        (0,              11,                  "[BE]DF header indicates 11 data records, but file contains 10 records. Updating header."),
+        (0,              -1,                  "[BE]DF header indicates -1 data records, but file contains 10 records. Updating header."),
     ],
 )
 def test_read_edf_with_invalid_number_of_records(
-    tmp_path: Path,
+    tmp_file: Path,
     extra_bytes: int,
     num_records_in_header: int,
     expected_warning: str,
 ):
-    invalid_edf = tmp_path / "invalid.edf"
-    copyfile(EDF_FILE, invalid_edf)
-    with invalid_edf.open("rb+") as file:
+    read_edf(EDF_FILE).write(tmp_file)
+    with tmp_file.open("rb+") as file:
         file.seek(236)
         file.write(f"{num_records_in_header: <8}".encode("ascii"))
         if extra_bytes > 0:
             file.seek(0, 2)
             file.write(b"\0" * extra_bytes)
 
-    for io_obj in (invalid_edf, invalid_edf.read_bytes()):
-        with pytest.warns(UserWarning, match=expected_warning):
+    for io_obj in (tmp_file, tmp_file.read_bytes()):
+        if expected_warning is None:
+            ctx = nullcontext()
+        else:
+            ctx = pytest.warns(UserWarning, match=expected_warning)
+        with ctx:
             edf = read_edf(io_obj)
         assert edf.num_data_records == 10
         comparison_edf = read_edf(EDF_FILE)
@@ -1203,6 +1248,7 @@ def test_read_edf_with_invalid_number_of_records(
 # fmt: on
 
 
+@pytest.mark.edf
 def test_fail_lazy_load():
     edf_data = EDF_FILE.read_bytes()
     with pytest.raises(
@@ -1220,6 +1266,7 @@ def test_lazy_loading_defaults_to_false_for_non_paths():
         assert signal._lazy_loader is None
 
 
+@pytest.mark.edf
 def test_lazy_loading_defaults_to_true_for_paths():
     edf = read_edf(EDF_FILE)
     assert len(edf.signals) > 0
@@ -1237,6 +1284,18 @@ def test_create_edf_with_many_annotations():
     assert edf is not None
 
 
+@pytest.mark.parametrize("edf_klass", [Edf, Bdf])
+@pytest.mark.parametrize("signal_klass", [EdfSignal, BdfSignal])
+def test_edf_bdf_cross_error(edf_klass, signal_klass):
+    signal = signal_klass(np.arange(10), 1)
+    if edf_klass._signal_class is type(signal):
+        ctx = nullcontext()
+    else:
+        ctx = pytest.raises(ValueError, match="Signal 0 .* has format .* but .*")
+    with ctx:
+        edf_klass([signal])
+
+
 def test_read_edf_with_latin_1_encoded_header_fields(tmp_file: Path):
     signal = EdfSignal(np.arange(10), 1)
     signal._label = "Posição".encode("latin-1").ljust(16)
@@ -1249,9 +1308,12 @@ def test_read_edf_with_latin_1_encoded_header_fields(tmp_file: Path):
     edf._local_recording_identification = "Startdate X X Soméone X".encode(
         "latin-1"
     ).ljust(80)
+    assert edf.num_data_records == 10
     edf.write(tmp_file)
 
     edf = read_edf(tmp_file)
+    assert edf.signals[0].samples_per_data_record == 1
+    assert edf.num_data_records == 10
     assert edf.signals[0].label == "Posi��o"
     assert edf.signals[0].transducer_type == "C�nula"
     assert edf.signals[0].physical_dimension == "�V"
@@ -1266,3 +1328,17 @@ def test_read_edf_with_latin_1_encoded_header_fields(tmp_file: Path):
     assert edf.signals[0].prefiltering == "é"
     assert edf.patient.name == "René"
     assert edf.recording.investigator_technician_code == "Soméone"
+
+
+# Using Edf or EdfSignal in pytest.mark.parametrize breaks our mechanism to
+# automatically test both EDF and BDF. These tests ensure such cases are detected.
+@pytest.mark.xfail(strict=True)
+@pytest.mark.parametrize("edf", [Edf([EdfSignal(np.arange(10), 1)])])
+def test_parametrization_check_edf(edf):
+    pass  # pragma: no cover
+
+
+@pytest.mark.xfail(strict=True)
+@pytest.mark.parametrize("signal", [EdfSignal(np.arange(10), 1)])
+def test_parametrization_check_edf_signal(signal):
+    pass  # pragma: no cover

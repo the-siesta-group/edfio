@@ -16,7 +16,7 @@ It requires Python>=3.9 and NumPy>=1.22 and is available on PyPI:
 
     pip install edfio
 
-- Support for EDF and EDF+C, including annotations
+- Support for EDF, EDF+C, BDF, and BDF+C including annotations
 - Fast I/O thanks to NumPy - read and write GB-sized files in seconds
 - Fail late on read: Non-compliant header fields only raise an exception when the corresponding property is accessed.
 - Fail early on write: Trying to create a new non-compliant EDF file raises an exception.
@@ -31,6 +31,7 @@ It requires Python>=3.9 and NumPy>=1.22 and is available on PyPI:
 - Slice recordings (by seconds or annotation texts)
 - Drop individual signals
 - Anonymize recordings
+- BDF file ([BioSemi](https://www.biosemi.com/faq/file_format.htm)) support
 
 
 ## Known limitations
@@ -38,7 +39,6 @@ It requires Python>=3.9 and NumPy>=1.22 and is available on PyPI:
 - The maximum data record size of 61440 bytes recommended by the [EDF specs](https://www.edfplus.info/specs/edf.html) is not enforced.
 - To write an EDF with a non-integer seconds duration, the data record duration has to be manually set to an appropriate value.
 - Slicing an EDF to a timespan that is not an integer multiple of the data record duration does not work.
-- BDF files ([BioSemi](https://www.biosemi.com/faq/file_format.htm)) are not supported.
 
 
 ## Contributing

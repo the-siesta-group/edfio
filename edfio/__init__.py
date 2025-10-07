@@ -1,7 +1,7 @@
-from edfio.edf import Edf, read_edf
+from edfio.edf import Bdf, Edf, read_bdf, read_edf
 from edfio.edf_annotations import EdfAnnotation
 from edfio.edf_header import AnonymizedDateError, Patient, Recording
-from edfio.edf_signal import EdfSignal
+from edfio.edf_signal import BdfSignal, EdfSignal
 
 try:
     from importlib.metadata import version
@@ -13,10 +13,13 @@ except Exception:  # pragma: no cover
 
 __all__ = [
     "AnonymizedDateError",
+    "Bdf",
+    "BdfSignal",
     "Edf",
     "EdfAnnotation",
     "EdfSignal",
     "Patient",
     "Recording",
+    "read_bdf",
     "read_edf",
 ]
