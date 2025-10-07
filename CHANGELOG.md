@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## [0.4.10] - 2025-10-07
+
 ### Added
 - Support reading and writing BDF and BDF+C files ([#63](https://github.com/the-siesta-group/edfio/pull/63)).
 
