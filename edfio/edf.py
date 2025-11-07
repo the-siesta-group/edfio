@@ -1194,8 +1194,8 @@ def _calculate_num_data_records(
         )
     for f in (lambda x: x, lambda x: Decimal(str(x))):
         required_num_data_records = f(signal_duration) / f(data_record_duration)
-        if required_num_data_records == int(required_num_data_records):
-            return int(required_num_data_records)
+        if np.isclose(required_num_data_records, round(required_num_data_records), atol=1e-10):
+            return round(required_num_data_records)
     raise ValueError(
         f"_Signal duration of {signal_duration}s is not exactly divisible by data_record_duration of {data_record_duration}s"
     )
