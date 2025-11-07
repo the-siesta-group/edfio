@@ -60,4 +60,4 @@ class LazyLoader(Generic[_DigitalDtype]):
             raise ValueError("Invalid slice: Slice exceeds EDF duration")
         return self.buffer[
             start_record:end_record, self.start_sample : self.end_sample
-        ].flatten()
+        ].ravel()
