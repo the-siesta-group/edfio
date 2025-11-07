@@ -952,12 +952,28 @@ class _Base(Generic[_Signal]):
         stream.seek(0)
         return stream.read()
 
+    def _slice_signal_between_seconds(self, signal, start, stop, keep_all_annotations):
+        """Slice a single signal between two times."""
+        if signal._is_annotation_signal:
+            return self._slice_annotations_signal(
+                signal,
+                start=start,
+                stop=stop,
+                keep_all_annotations=keep_all_annotations,
+            )
+        else:
+            start_index = start * signal.sampling_frequency
+            stop_index = stop * signal.sampling_frequency
+            signal._digital = signal.digital[int(start_index) : int(stop_index)]  # type: ignore[assignment]
+            return signal
+
     def slice_between_seconds(
         self,
         start: float,
         stop: float,
         *,
         keep_all_annotations: bool = False,
+        n_jobs: int = 1,
     ) -> None:
         """
         Slice to the interval between two times.
@@ -975,27 +991,21 @@ class _Base(Generic[_Signal]):
         keep_all_annotations : bool, default: False
             If set to `True`, annotations outside the selected time interval are kept.
         """
-        signals: list[_Signal] = []
         self._verify_seconds_inside_recording_time(start)
         self._verify_seconds_inside_recording_time(stop)
         self._verify_seconds_coincide_with_sample_time(start)
         self._verify_seconds_coincide_with_sample_time(stop)
-        self._set_num_data_records(int((stop - start) / self.data_record_duration))
-        for signal in self._signals:
-            if signal._is_annotation_signal:
-                signals.append(
-                    self._slice_annotations_signal(
-                        signal,
-                        start=start,
-                        stop=stop,
-                        keep_all_annotations=keep_all_annotations,
-                    )
-                )
-            else:
-                start_index = start * signal.sampling_frequency
-                stop_index = stop * signal.sampling_frequency
-                signal._digital = signal.digital[int(start_index) : int(stop_index)]  # type: ignore[assignment]
-                signals.append(signal)
+        self._set_num_data_records(_calculate_num_data_records(stop - start, self.data_record_duration))
+            
+        if n_jobs == 1:
+            signals: list[_Signal] = []
+            for signal in self._signals:
+                signals.append(self._slice_signal(signal, start, stop, keep_all_annotations))
+        else:
+            signals = Parallel(n_jobs=n_jobs)(
+                delayed(self._slice_signal_between_seconds)(signal, start, stop, keep_all_annotations)
+                for signal in tqdm(self._signals)
+            )
         self._set_signals(signals)
         self._shift_startdatetime(int(start))
 
