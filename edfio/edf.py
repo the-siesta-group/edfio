@@ -14,6 +14,7 @@ from fractions import Fraction
 from math import ceil, floor
 from pathlib import Path
 from typing import ClassVar, Generic, Literal, TypeVar, Union
+from tqdm import tqdm
 
 import numpy as np
 
@@ -981,7 +982,7 @@ class _Base(Generic[_Signal]):
         self._verify_seconds_coincide_with_sample_time(start)
         self._verify_seconds_coincide_with_sample_time(stop)
         self._set_num_data_records(int((stop - start) / self.data_record_duration))
-        for signal in self._signals:
+        for signal in tqdm(self._signals):
             if signal._is_annotation_signal:
                 signals.append(
                     self._slice_annotations_signal(
