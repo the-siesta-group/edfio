@@ -13,9 +13,10 @@ from decimal import Decimal
 from fractions import Fraction
 from math import ceil, floor
 from pathlib import Path
-from typing import ClassVar, Generic, Literal, TypeVar, Union
+from typing import ClassVar, Generic, Literal, TypeVar, Union, cast
 
 import numpy as np
+import numpy.typing as npt
 
 from edfio._header_field import (
     decode_date,
@@ -28,7 +29,7 @@ from edfio._header_field import (
     encode_str,
     encode_time,
 )
-from edfio._lazy_loading import LazyLoader
+from edfio._lazy_loading import LazyLoader, _DigitalDtype
 from edfio.edf_annotations import (
     EdfAnnotation,
     _create_annotations_signal,
@@ -992,7 +993,9 @@ class _Base(Generic[_Signal]):
                     )
                 )
             else:
-                signal._digital = signal.get_digital_slice(start, stop)
+                signal._digital = cast(
+                    npt.NDArray[_DigitalDtype], signal.get_digital_slice(start, stop)
+                )
                 signals.append(signal)
         self._set_signals(signals)
         self._shift_startdatetime(int(start))
