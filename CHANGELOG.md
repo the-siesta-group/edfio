@@ -4,6 +4,9 @@
 
 ## [0.4.10] - 2025-10-07
 
+### Fixed
+- Use lazy loading in `Edf.slice_between_seconds` to speed up execution ([#93](https://github.com/the-siesta-group/edfio/pull/93))
+
 ### Added
 - Support reading and writing BDF and BDF+C files ([#63](https://github.com/the-siesta-group/edfio/pull/63)).
 
