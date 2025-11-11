@@ -294,7 +294,7 @@ class _BaseSignal(Generic[_DigitalDtype]):
         return self._sampling_frequency
 
     @property
-    def digital(self) -> npt.NDArray[np.int16 | np.int32]:
+    def digital(self) -> npt.NDArray[_DigitalDtype]:
         """
         Numpy array containing the digital (uncalibrated) signal values as integers.
 
