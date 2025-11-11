@@ -351,7 +351,7 @@ class _BaseSignal(Generic[_DigitalDtype]):
 
     def get_digital_slice(
         self, start_second: float, stop_second: float
-    ) -> npt.NDArray[np.int16 | np.int32]:
+    ) -> npt.NDArray[_DigitalDtype]:
         """
         Get a slice of the digital signal values.
 
