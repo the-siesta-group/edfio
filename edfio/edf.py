@@ -992,9 +992,7 @@ class _Base(Generic[_Signal]):
                     )
                 )
             else:
-                start_index = start * signal.sampling_frequency
-                stop_index = stop * signal.sampling_frequency
-                signal._digital = signal.digital[int(start_index) : int(stop_index)]  # type: ignore[assignment]
+                signal._digital = signal.get_digital_slice(start, stop)
                 signals.append(signal)
         self._set_signals(signals)
         self._shift_startdatetime(int(start))
