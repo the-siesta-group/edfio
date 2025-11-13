@@ -49,6 +49,7 @@ else:  # pragma: no cover
 
 
 _Signal = TypeVar("_Signal", bound=Union[EdfSignal, BdfSignal])
+ABSOLUTE_TOLERANCE = 1e-8  # for rounding to seconds * sampling_frequency to samples
 
 
 class _Base(Generic[_Signal]):
@@ -1051,7 +1052,7 @@ class _Base(Generic[_Signal]):
     def _verify_seconds_coincide_with_sample_time(self, seconds: float) -> None:
         for i, signal in enumerate(self.signals):
             index = seconds * signal.sampling_frequency
-            if index != int(index):
+            if abs(index - round(index)) > ABSOLUTE_TOLERANCE:
                 raise ValueError(
                     f"{seconds}s is not a sample time of signal {i} ({signal.label}) with fs={signal.sampling_frequency}Hz"
                 )
@@ -1194,7 +1195,9 @@ def _calculate_num_data_records(
         )
     for f in (lambda x: x, lambda x: Decimal(str(x))):
         required_num_data_records = f(signal_duration) / f(data_record_duration)
-        if np.isclose(required_num_data_records, round(required_num_data_records), atol=1e-10):
+        if abs(required_num_data_records - f(round(required_num_data_records))) <= f(
+            ABSOLUTE_TOLERANCE
+        ):
             return round(required_num_data_records)
     raise ValueError(
         f"_Signal duration of {signal_duration}s is not exactly divisible by data_record_duration of {data_record_duration}s"
