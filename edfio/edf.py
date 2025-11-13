@@ -980,7 +980,9 @@ class _Base(Generic[_Signal]):
         self._verify_seconds_inside_recording_time(stop)
         self._verify_seconds_coincide_with_sample_time(start)
         self._verify_seconds_coincide_with_sample_time(stop)
-        self._set_num_data_records(_calculate_num_data_records(stop - start, self.data_record_duration))
+        self._set_num_data_records(
+            _calculate_num_data_records(stop - start, self.data_record_duration)
+        )
         for signal in self._signals:
             if signal._is_annotation_signal:
                 signals.append(
