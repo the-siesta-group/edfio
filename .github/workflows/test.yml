@@ -58,4 +58,4 @@ jobs:
       - name: Install Python ${{ matrix.python-version }}
         run: uv python install ${{ matrix.python-version }}
       - name: Pytest
-        run: uv run --with ${{ matrix.numpy }} pytest -Werror --cov --cov-report term-missing --cov-fail-under=100
+        run: uv run --python=${{matrix.python-version}} --with ${{ matrix.numpy }} pytest -Werror --cov --cov-report term-missing --cov-fail-under=100
