@@ -580,6 +580,70 @@ class EdfSignal(_BaseSignal[np.int16]):
             prefiltering=prefiltering,
         )
 
+    @classmethod
+    def from_digital(
+        cls,
+        digital: npt.NDArray[np.int16],
+        sampling_frequency: float,
+        *,
+        physical_range: tuple[float, float],
+        label: str = "",
+        transducer_type: str = "",
+        physical_dimension: str = "",
+        digital_range: tuple[int, int] = _EDF_DEFAULT_RANGE,
+        prefiltering: str = "",
+    ) -> Self:
+        """Create a single EDF signal from existing digital data.
+
+        Parameters that have been modified from those in :class:`EdfSignal` are
+        documented below. The parameter `data` has been removed, as the digital
+        values that would be written to the EDF file are set directly from
+        `digital`. See :class:`EdfSignal` for details on the remaining
+        parameters.
+
+        Parameters
+        ----------
+        digital : npt.NDArray[np.int16]
+            The 16-bit integer array containing the digital values that would be
+            written to the EDF file.
+        physical_range : tuple[float, float]
+            The physical range given as a tuple of `(physical_min,
+            physical_max)`.
+        """
+        sig = object.__new__(cls)
+        sig._sampling_frequency = sampling_frequency
+        sig.label = label
+        sig.transducer_type = transducer_type
+        sig.physical_dimension = physical_dimension
+        sig.prefiltering = prefiltering
+        sig._set_reserved("")
+
+        if digital.dtype != np.int16:
+            raise ValueError("Digital data must have `numpy.int16` dtype")
+
+        physical_range = _FloatRange(*physical_range)
+        if physical_range.min == physical_range.max:
+            raise ValueError(
+                f"Physical minimum ({physical_range.min}) must differ from physical maximum ({physical_range.max})."
+            )
+        sig._physical_min = encode_float(
+            _round_float_to_8_characters(physical_range.min, math.floor)
+        )
+        sig._physical_max = encode_float(
+            _round_float_to_8_characters(physical_range.max, math.ceil)
+        )
+
+        data_min = digital.min()
+        data_max = digital.max()
+        if not np.all((data_min >= digital_range[0]) & (data_max <= digital_range[1])):
+            raise ValueError(
+                f"Signal range [{data_min}, {data_max}] out of digital range: [{digital_range[0]}, {digital_range[1]}]"
+            )
+        sig._set_digital_range(digital_range)
+        sig._digital = digital
+        sig._header_encoding = "ascii"
+        return sig
+
 
 class BdfSignal(_BaseSignal[np.int32]):
     """A single BDF signal.
