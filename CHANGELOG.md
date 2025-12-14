@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Added
+- Add `EdfSignal.from_digital` and `BdfSignal.from_digital` to allow creating signals from digital data ([#96](https://github.com/the-siesta-group/edfio/pull/96))
+- Ensure the `digital_range` parameter of `EdfSignal`/`BdfSignal` is within the range supported by the format ([#96](https://github.com/the-siesta-group/edfio/pull/96))
+
 ## [0.4.11] - 2025-11-19
 
 ### Fixed
