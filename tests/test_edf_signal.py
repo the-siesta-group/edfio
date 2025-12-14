@@ -578,3 +578,19 @@ def test_from_digital_invalid_limits(digital_range):
             sampling_frequency=1,
             digital_range=digital_range,
         )
+
+
+@pytest.mark.parametrize(
+    "digital_range",
+    [
+        pytest.param([-32769, 32767], marks=pytest.mark.edf),
+        pytest.param([-32768, 32768], marks=pytest.mark.edf),
+        pytest.param([-8388609, 8388607], marks=pytest.mark.bdf),
+        pytest.param([-8388608, 8388608], marks=pytest.mark.bdf),
+    ],
+)
+def test_edf_signal_invalid_digital_range(digital_range):
+    with pytest.raises(
+        ValueError, match="Digital range .* out of supported range .* for .*"
+    ):
+        EdfSignal(np.array([-1, 1]), 1, digital_range=digital_range)

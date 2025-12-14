@@ -3,7 +3,7 @@ from __future__ import annotations
 import math
 import sys
 import warnings
-from typing import Callable, ClassVar, Generic, Literal, NamedTuple
+from typing import Any, Callable, ClassVar, Generic, Literal, NamedTuple
 
 import numpy as np
 import numpy.typing as npt
@@ -62,6 +62,24 @@ def _calculate_gain_and_offset(
     return gain, offset
 
 
+def _check_data_range(
+    data: npt.NDArray[Any],
+    range: tuple[float, float] | None,
+    range_type: Literal["physical", "digital"],
+) -> _FloatRange:
+    data_min = data.min()
+    data_max = data.max()
+    if range is None:
+        if data_min == data_max:
+            data_max = data_min + 1
+        return (data_min, data_max)  # type: ignore[return-value]
+    if data_min < range[0] or data_max > range[1]:
+        raise ValueError(
+            f"Signal range [{data_min}, {data_max}] out of {range_type} range: [{range[0]}, {range[1]}]"
+        )
+    return range  # type: ignore[return-value]
+
+
 class _BaseSignal(Generic[_DigitalDtype]):
     _header_fields = (
         ("label", 16),
@@ -102,7 +120,8 @@ class _BaseSignal(Generic[_DigitalDtype]):
         self._set_reserved("")
         if not np.all(np.isfinite(data)):
             raise ValueError("Signal data must contain only finite values")
-        self._set_physical_range(physical_range, data)
+        physical_range = _check_data_range(data, physical_range, "physical")
+        self._set_physical_range(physical_range)
         self._set_digital_range(digital_range)
         self._set_data(data)
         self._header_encoding = "ascii"
@@ -134,10 +153,6 @@ class _BaseSignal(Generic[_DigitalDtype]):
             The 16-bit (EDF) or 32-bit (BDF) integer array containing the digital values
             to be written to the file.
         """
-        if digital_range is None:
-            digital_range = cls._default_digital_range
-        if physical_range is None:
-            physical_range = digital_range
         sig = object.__new__(cls)
         sig._sampling_frequency = sampling_frequency
         sig.label = label
@@ -146,37 +161,17 @@ class _BaseSignal(Generic[_DigitalDtype]):
         sig.prefiltering = prefiltering
         sig._set_reserved("")
 
+        if digital_range is None:
+            digital_range = cls._default_digital_range
+        if physical_range is None:
+            physical_range = digital_range
         if digital.dtype != cls._digital_dtype:
             raise ValueError(
                 f"Digital data must be of dtype {cls._digital_dtype.__name__}, got {digital.dtype}"
             )
+        _check_data_range(digital, digital_range, "digital")
 
-        physical_range = _FloatRange(*physical_range)
-        if physical_range.min == physical_range.max:
-            raise ValueError(
-                f"Physical minimum ({physical_range.min}) must differ from physical maximum ({physical_range.max})."
-            )
-        if (
-            digital_range[0] < cls._default_digital_range[0]
-            or digital_range[1] > cls._default_digital_range[1]
-        ):
-            raise ValueError(
-                f"Digital range {digital_range} out of supported range {cls._default_digital_range} for {cls._fmt}."
-            )
-
-        sig._physical_min = encode_float(
-            _round_float_to_8_characters(physical_range.min, math.floor)
-        )
-        sig._physical_max = encode_float(
-            _round_float_to_8_characters(physical_range.max, math.ceil)
-        )
-
-        data_min = digital.min()
-        data_max = digital.max()
-        if not np.all((data_min >= digital_range[0]) & (data_max <= digital_range[1])):
-            raise ValueError(
-                f"Signal range [{data_min}, {data_max}] out of digital range: [{digital_range[0]}, {digital_range[1]}]"
-            )
+        sig._set_physical_range(physical_range)
         sig._set_digital_range(digital_range)
         sig._digital = digital
         sig._header_encoding = "ascii"
@@ -515,7 +510,8 @@ class _BaseSignal(Generic[_DigitalDtype]):
                 f"Signal lengths must match: got {len(data)}, expected {len(self.digital)}."
             )
         physical_range = self.physical_range if keep_physical_range else None
-        self._set_physical_range(physical_range, data)
+        physical_range = _check_data_range(data, physical_range, "physical")
+        self._set_physical_range(physical_range)
         if sampling_frequency is not None:
             self._sampling_frequency = sampling_frequency
         self._set_data(data)
@@ -541,30 +537,22 @@ class _BaseSignal(Generic[_DigitalDtype]):
             raise ValueError(
                 f"Digital minimum ({digital_range.min}) must differ from digital maximum ({digital_range.max})."
             )
+        if (
+            digital_range.min < self._default_digital_range[0]
+            or digital_range.max > self._default_digital_range[1]
+        ):
+            raise ValueError(
+                f"Digital range {digital_range} out of supported range {self._default_digital_range} for {self._fmt}."
+            )
         self._digital_min = encode_int(digital_range.min, 8)
         self._digital_max = encode_int(digital_range.max, 8)
 
-    def _set_physical_range(
-        self,
-        physical_range: tuple[float, float] | None,
-        data: npt.NDArray[np.float64],
-    ) -> None:
-        if physical_range is None:
-            physical_range = _FloatRange(data.min(), data.max())
-            if physical_range.min == physical_range.max:
-                physical_range = _FloatRange(physical_range.min, physical_range.max + 1)
-        else:
-            physical_range = _FloatRange(*physical_range)
-            if physical_range.min == physical_range.max:
-                raise ValueError(
-                    f"Physical minimum ({physical_range.min}) must differ from physical maximum ({physical_range.max})."
-                )
-            data_min = data.min()
-            data_max = data.max()
-            if data_min < physical_range.min or data_max > physical_range.max:
-                raise ValueError(
-                    f"Signal range [{data_min}, {data_max}] out of physical range: [{physical_range.min}, {physical_range.max}]"
-                )
+    def _set_physical_range(self, physical_range: tuple[float, float]) -> None:
+        physical_range = _FloatRange(*physical_range)
+        if physical_range.min == physical_range.max:
+            raise ValueError(
+                f"Physical minimum ({physical_range.min}) must differ from physical maximum ({physical_range.max})."
+            )
         self._physical_min = encode_float(
             _round_float_to_8_characters(physical_range.min, math.floor)
         )
