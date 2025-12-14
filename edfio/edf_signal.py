@@ -147,13 +147,23 @@ class _BaseSignal(Generic[_DigitalDtype]):
         sig._set_reserved("")
 
         if digital.dtype != cls._digital_dtype:
-            raise ValueError("Digital data must have `numpy.int16` dtype")
+            raise ValueError(
+                f"Digital data must be of dtype {cls._digital_dtype.__name__}, got {digital.dtype}"
+            )
 
         physical_range = _FloatRange(*physical_range)
         if physical_range.min == physical_range.max:
             raise ValueError(
                 f"Physical minimum ({physical_range.min}) must differ from physical maximum ({physical_range.max})."
             )
+        if (
+            digital_range[0] < cls._default_digital_range[0]
+            or digital_range[1] > cls._default_digital_range[1]
+        ):
+            raise ValueError(
+                f"Digital range {digital_range} out of supported range {cls._default_digital_range} for {cls._fmt}."
+            )
+
         sig._physical_min = encode_float(
             _round_float_to_8_characters(physical_range.min, math.floor)
         )
