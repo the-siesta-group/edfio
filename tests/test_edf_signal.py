@@ -480,3 +480,40 @@ def test_get_data_slice_with_no_data_available(lazy_loaded_signal: EdfSignal):
     lazy_loaded_signal._lazy_loader = None
     with pytest.raises(ValueError, match="Signal data not set"):
         lazy_loaded_signal.get_data_slice(0, 1)
+
+
+@pytest.mark.parametrize(
+    "digital",
+    [
+        pytest.param([-32768, 32767], marks=pytest.mark.edf),
+        pytest.param([-8388608, 8388607], marks=pytest.mark.bdf),
+    ],
+)
+def test_from_digital_without_digital_range(digital):
+    signal = EdfSignal.from_digital(
+        digital=np.array(digital, dtype=EdfSignal._digital_dtype),
+        sampling_frequency=1,
+        physical_range=(-500, 500),
+    )
+    assert signal.digital_range == EdfSignal._default_digital_range
+    np.testing.assert_equal(signal.data, [-500, 500])
+
+
+@pytest.mark.parametrize(
+    "digital_range",
+    [
+        [0, 10],
+        [-2048, 2047],
+        [-32768, 32767],
+        pytest.param([-65536, 65535], marks=pytest.mark.bdf),
+        pytest.param([-8388608, 8388607], marks=pytest.mark.bdf),
+    ],
+)
+def test_from_digital_with_digital_range(digital_range):
+    signal = EdfSignal.from_digital(
+        digital=np.array(digital_range, dtype=EdfSignal._digital_dtype),
+        sampling_frequency=1,
+        physical_range=(-500, 500),
+        digital_range=digital_range,
+    )
+    np.testing.assert_equal(signal.data, [-500, 500])
