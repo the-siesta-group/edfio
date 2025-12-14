@@ -113,10 +113,10 @@ class _BaseSignal(Generic[_DigitalDtype]):
         digital: npt.NDArray[_DigitalDtype],
         sampling_frequency: float,
         *,
-        physical_range: tuple[float, float],
         label: str = "",
         transducer_type: str = "",
         physical_dimension: str = "",
+        physical_range: tuple[float, float] | None = None,
         digital_range: tuple[int, int] | None = None,
         prefiltering: str = "",
     ) -> Self:
@@ -124,7 +124,9 @@ class _BaseSignal(Generic[_DigitalDtype]):
 
         This is similar to :class:`EdfSignal`, but the first parameter is the digital
         values to be written to the file, rather than the physical signal values.
-        Details on the remaining parameters can be found there.
+        Details on the remaining parameters can be found there. If `physical_range` is
+        not specified, an uncalibrated signal is created (i.e., `physical_range` is set
+        to equal `digital_range`).
 
         Parameters
         ----------
@@ -134,6 +136,8 @@ class _BaseSignal(Generic[_DigitalDtype]):
         """
         if digital_range is None:
             digital_range = cls._default_digital_range
+        if physical_range is None:
+            physical_range = digital_range
         sig = object.__new__(cls)
         sig._sampling_frequency = sampling_frequency
         sig.label = label

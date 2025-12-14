@@ -517,3 +517,13 @@ def test_from_digital_with_digital_range(digital_range):
         digital_range=digital_range,
     )
     np.testing.assert_equal(signal.data, [-500, 500])
+
+
+def test_from_digital_without_physical_range_creates_uncalibrated_signal():
+    digital = [0, 5, 10]
+    signal = EdfSignal.from_digital(
+        np.array(digital, dtype=EdfSignal._digital_dtype),
+        sampling_frequency=1,
+    )
+    assert signal.physical_range == EdfSignal._default_digital_range
+    np.testing.assert_equal(signal._digital, digital)
