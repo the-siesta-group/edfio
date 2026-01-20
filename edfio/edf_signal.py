@@ -429,7 +429,7 @@ class _BaseSignal(Generic[_DigitalDtype]):
             If not `None`, the `sampling_frequency` is updated to the new value. The new
             data must match the expected length for the new sampling frequency.
         """
-        expected_length = len(self.digital)
+        expected_length = self._num_samples
         if (
             sampling_frequency is not None
             and sampling_frequency != self._sampling_frequency
@@ -437,7 +437,7 @@ class _BaseSignal(Generic[_DigitalDtype]):
             expected_length = self._get_expected_new_length(sampling_frequency)
         if len(data) != expected_length:
             raise ValueError(
-                f"Signal lengths must match: got {len(data)}, expected {len(self.digital)}."
+                f"Signal lengths must match: got {len(data)}, expected {expected_length}."
             )
         physical_range = self.physical_range if keep_physical_range else None
         self._set_physical_range(physical_range, data)
@@ -450,9 +450,8 @@ class _BaseSignal(Generic[_DigitalDtype]):
             raise ValueError(
                 f"Sampling frequency must be positive, got {sampling_frequency}"
             )
-        current_length = len(self.digital)
         expected_length_f = (
-            sampling_frequency / self._sampling_frequency * current_length
+            sampling_frequency / self._sampling_frequency * self._num_samples
         )
         if not math.isclose(expected_length_f, round(expected_length_f), rel_tol=1e-10):
             raise ValueError(
@@ -508,10 +507,21 @@ class _BaseSignal(Generic[_DigitalDtype]):
 
     @property
     def _num_samples(self) -> int:
-        len_digital = len(self.digital)
+        if self._digital is not None:
+            if self._is_annotation_signal:
+                return len(self._digital.view(np.uint8)) // self._bytes_per_sample
+            return len(self._digital)
+        assert self._lazy_loader is not None
         if self._is_annotation_signal:
-            return len_digital // self._bytes_per_sample
-        return len_digital
+            return (
+                self._lazy_loader.buffer.shape[0]
+                * self._lazy_loader.buffer.itemsize
+                * (self._lazy_loader.end_sample - self._lazy_loader.start_sample)
+                // self._bytes_per_sample
+            )
+        return self._lazy_loader.buffer.shape[0] * (
+            self._lazy_loader.end_sample - self._lazy_loader.start_sample
+        )
 
     @property
     def _bytes_per_data_record(self) -> int:
