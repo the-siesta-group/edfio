@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+## Changed
+- Avoid loading data from disk when creating a new `Edf` object based on signals from an existing file ([#98](https://github.com/the-siesta-group/edfio/pull/98))
+
 ## [0.4.11] - 2025-11-19
 
 ### Fixed
