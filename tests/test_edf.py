@@ -368,6 +368,21 @@ def test_edf_signal_requiring_rounding_in_physical_max_is_written_and_read_corre
     np.testing.assert_equal(loaded_signal.data, signal.data)
 
 
+@pytest.mark.parametrize(
+    ("birthdate", "reference_date", "expected_age"),
+    [
+        (datetime.date(1990, 5, 15), datetime.date(2020, 10, 20), 30),
+        (datetime.date(1990, 5, 15), datetime.date(2020, 3, 10), 29),
+    ],
+)
+def test_calc_age_in_years(
+    birthdate: datetime.date,
+    reference_date: datetime.date,
+    expected_age: int,
+):
+    assert _calc_age_in_years(birthdate, reference_date) == expected_age
+
+
 def test_edf_anonymized_default(tmp_file: Path):
     edf = read_edf(EDF_FILE)
     edf_anon = edf.copy()
@@ -455,6 +470,26 @@ def test_edf_anonymized_keep_flags(
             edf_anon.patient.birthdate, edf_anon.recording.startdate
         )
         assert anonymized_age == original_age
+
+
+@pytest.mark.edf
+def test_edf_anonymize_already_anonymized():
+    edf = read_edf(TEST_DATA_DIR / "test_subsecond.edf")
+    # first anonymize without keeping age (birthdate becomes "X")
+    edf.anonymize()
+
+    # verify birthdate is anonymized
+    with pytest.raises(AnonymizedDateError):
+        edf.patient.birthdate
+
+    # now anonymize again with keep_age=True
+    edf.anonymize(keep_age=True)
+
+    # birthdate should still be anonymized (None)
+    with pytest.raises(AnonymizedDateError):
+        edf.patient.birthdate
+
+    assert edf.recording.startdate == datetime.date(1985, 1, 1)
 
 
 def test_read_edf_str():
