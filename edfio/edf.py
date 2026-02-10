@@ -780,7 +780,7 @@ class _Base(Generic[_Signal]):
             except AnonymizedDateError:  # already anonymized
                 birthdate = None
             else:
-                age = _calc_age_in_years(birthdate, self.startdate)
+                age = _calc_age_in_years(birthdate, self.startdate)  # type: ignore[arg-type]
                 birthdate = datetime.date(1985 - age, 1, 1)
         else:
             birthdate = None
