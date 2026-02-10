@@ -392,6 +392,7 @@ def test_edf_anonymized_default(tmp_file: Path):
     )
 
 
+@pytest.mark.edf
 @pytest.mark.parametrize(
     ("keep_age", "keep_sex", "keep_starttime"),
     [
