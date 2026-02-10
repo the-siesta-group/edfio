@@ -405,7 +405,6 @@ def test_edf_anonymized_default(tmp_file: Path):
     ],
 )
 def test_edf_anonymized_keep_flags(
-    tmp_file: Path,
     *,
     keep_age: bool,
     keep_sex: bool,
