@@ -473,7 +473,7 @@ def test_edf_anonymized_keep_flags(
 
 
 def test_edf_anonymize_already_anonymized():
-    edf = read_edf(TEST_DATA_DIR / "test_subsecond.edf")
+    edf = read_edf(SUBSECOND_TEST_FILE)  # this file has a birthdate
     # first anonymize without keeping age (birthdate becomes "X")
     edf.anonymize()
 
