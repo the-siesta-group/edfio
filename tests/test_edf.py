@@ -472,7 +472,6 @@ def test_edf_anonymized_keep_flags(
         assert anonymized_age == original_age
 
 
-@pytest.mark.edf
 def test_edf_anonymize_already_anonymized():
     edf = read_edf(TEST_DATA_DIR / "test_subsecond.edf")
     # first anonymize without keeping age (birthdate becomes "X")
