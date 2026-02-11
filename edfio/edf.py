@@ -51,6 +51,28 @@ else:  # pragma: no cover
 _Signal = TypeVar("_Signal", bound=Union[EdfSignal, BdfSignal])
 
 
+def _calc_age_in_years(birthdate: datetime.date, reference_date: datetime.date) -> int:
+    """Calculate age in years at a reference date.
+
+    Parameters
+    ----------
+    birthdate : datetime.date
+        The date of birth.
+    reference_date : datetime.date
+        The date at which to calculate the age.
+
+    Returns
+    -------
+    int
+        The age in years.
+    """
+    age = reference_date.year - birthdate.year
+    # adjust if birthday hasn't occurred yet in the reference year
+    if (reference_date.month, reference_date.day) < (birthdate.month, birthdate.day):
+        age -= 1
+    return age
+
+
 class _Base(Generic[_Signal]):
     _header_fields = (
         ("version", 8),
@@ -717,11 +739,17 @@ class _Base(Generic[_Signal]):
             elif diff < 0:
                 signal._set_data(signal.data[:diff])
 
-    def anonymize(self) -> None:
+    def anonymize(
+        self,
+        *,
+        keep_age: bool = False,
+        keep_sex: bool = False,
+        keep_starttime: bool = False,
+    ) -> None:
         """
         Anonymize a recording.
 
-        Header fields are modified as follows:
+        By default, header fields are modified as follows:
           - local patient identification is set to `X X X X`
           - local recording identification is set to `Startdate X X X X`
           - startdate is set to `01.01.85`
@@ -729,10 +757,41 @@ class _Base(Generic[_Signal]):
 
         For EDF+ files, subsecond starttimes specified via an annotations signal are
         removed.
+
+        Optionally, parts of the original information can be preserved by setting the
+        corresponding parameters to True (see below).
+
+        Parameters
+        ----------
+        keep_age : bool, default: False
+            Whether to keep age information relative to the anonymized start date in the
+            local patient identification. If True, the birthdate is set to January 1st
+            of the year that preserves the age relative to `01.01.85`. This implies that
+            the local patient identification is set to `X X 01-JAN-YYYY X`, where `YYYY`
+            is the age-preserving year.
+        keep_sex : bool, default: False
+            Whether to keep the sex field in the local patient identification.
+        keep_starttime : bool, default: False
+            Whether to keep the original start time.
         """
-        self.patient = Patient()
-        self.recording = Recording()
-        self.starttime = datetime.time(0, 0, 0)
+        if keep_age:
+            try:
+                birthdate = self.patient.birthdate
+            except AnonymizedDateError:  # already anonymized
+                birthdate = None
+            else:
+                age = _calc_age_in_years(birthdate, self.startdate)  # type: ignore[arg-type]
+                birthdate = datetime.date(1985 - age, 1, 1)
+        else:
+            birthdate = None
+
+        startdate = datetime.date(1985, 1, 1) if keep_age else None
+        sex = self.patient.sex if keep_sex else "X"
+        starttime = self.starttime if keep_starttime else datetime.time(0, 0, 0)
+
+        self.patient = Patient(sex=sex, birthdate=birthdate)  # type: ignore[arg-type]
+        self.recording = Recording(startdate=startdate)
+        self.starttime = starttime
 
     def drop_signals(self, drop: Iterable[int | str]) -> None:
         """

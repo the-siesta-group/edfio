@@ -2,15 +2,18 @@
 
 ## Unreleased
 
+### Added
+- Add `keep_age`, `keep_sex`, and `keep_starttime` parameters to `Edf.anonymize()` for optionally keeping these fields when anonymizing an EDF/BDF record ([#100](https://github.com/the-siesta-group/edfio/pull/100) by [Clemens Brunner](https://github.com/cbrnr)).
+
 ## [0.4.12] - 2026-01-20
 
-## Changed
-- Avoid loading data from disk when creating a new `Edf` object based on signals from an existing file ([#98](https://github.com/the-siesta-group/edfio/pull/98))
+### Changed
+- Avoid loading data from disk when creating a new `Edf` object based on signals from an existing file ([#98](https://github.com/the-siesta-group/edfio/pull/98)).
 
 ## [0.4.11] - 2025-11-19
 
 ### Fixed
-- Use lazy loading in `Edf.slice_between_seconds` to speed up execution ([#93](https://github.com/the-siesta-group/edfio/pull/93))
+- Use lazy loading in `Edf.slice_between_seconds` to speed up execution ([#93](https://github.com/the-siesta-group/edfio/pull/93)).
 
 ## [0.4.10] - 2025-10-07
 
@@ -23,20 +26,20 @@
 ## [0.4.9] - 2025-05-19
 
 ### Fixed
-- When reading a file where the number of datarecords is set to `-1` in the header, automatically fix the corresponding field and issue a warning ([#74](https://github.com/the-siesta-group/edfio/pull/74)).
+- When reading a file where the number of data records is set to `-1` in the header, automatically fix the corresponding field and issue a warning ([#74](https://github.com/the-siesta-group/edfio/pull/74)).
 
 ## [0.4.8] - 2025-03-26
 
 ### Added
-- Add a parameter `header_encoding="ascii"` to `read_edf()` to support reading header fields that use a character encoding different to ascii ([#68](https://github.com/the-siesta-group/edfio/pull/68)) ([JohnAtl](https://github.com/JohnAtl))
+- Add a parameter `header_encoding="ascii"` to `read_edf()` to support reading header fields that use a character encoding different to ASCII ([#68](https://github.com/the-siesta-group/edfio/pull/68) by [JohnAtl](https://github.com/JohnAtl)).
 
 ### Fixed
-- Use ascii instead of utf-8 as the default character encoding for reading header fields ([#68](https://github.com/the-siesta-group/edfio/pull/68)) ([JohnAtl](https://github.com/JohnAtl))
+- Use ASCII instead of UTF-8 as the default character encoding for reading header fields ([#68](https://github.com/the-siesta-group/edfio/pull/68) by [JohnAtl](https://github.com/JohnAtl)).
 
 ## [0.4.7] - 2025-03-21
 
 ### Fixed
-- Allow having annotations with and without durations in the same recording ([#67](https://github.com/the-siesta-group/edfio/pull/67)) ([JohnAtl](https://github.com/JohnAtl))
+- Allow having annotations with and without durations in the same recording ([#67](https://github.com/the-siesta-group/edfio/pull/67) by [JohnAtl](https://github.com/JohnAtl)).
 
 ## [0.4.6] - 2025-02-27
 
@@ -123,12 +126,12 @@
 
 ### Fixed
 - When `EdfSignal.physical_min` or `EdfSignal.physical_max` do not fit into their header fields, they are now always rounded down or up, respectively, to ensure all physical values lie within the physical range ([#2](https://github.com/the-siesta-group/edfio/pull/2)).
-- The calculation of `num_data_records` from signal duration and `data_record_duration` is now more robust to floating point errors ([#3](https://github.com/the-siesta-group/edfio/pull/3))
+- The calculation of `num_data_records` from signal duration and `data_record_duration` is now more robust to floating point errors ([#3](https://github.com/the-siesta-group/edfio/pull/3)).
 
 ## [0.1.1] - 2023-11-09
 
 ### Fixed
-- Use correct path to sphinx config file in `.readthedocs.yml`
+- Use correct path to sphinx config file in `.readthedocs.yml`.
 
 ## [0.1.0] - 2023-11-09
 
