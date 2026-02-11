@@ -30,6 +30,7 @@ from tests.conftest import _Context
 
 EDF_FILE = TEST_DATA_DIR / "short_psg.edf"
 EDF_SIGNAL_REFERENCE_FILE = TEST_DATA_DIR / "short_psg_header_reference.json"
+SUBSECOND_TEST_FILE = TEST_DATA_DIR / "test_subsecond.edf"
 
 
 # no idea why, but doing this here once works, but adding it to pytest.ini_options in
@@ -407,7 +408,6 @@ def test_edf_anonymized_default(tmp_file: Path):
     )
 
 
-@pytest.mark.edf
 @pytest.mark.parametrize(
     ("keep_age", "keep_sex", "keep_starttime"),
     [
@@ -426,7 +426,7 @@ def test_edf_anonymized_keep_flags(
     keep_sex: bool,
     keep_starttime: bool,
 ):
-    edf = read_edf(TEST_DATA_DIR / "test_subsecond.edf")  # this file has a birthdate
+    edf = read_edf(SUBSECOND_TEST_FILE)  # this file has a birthdate
     original_age = _calc_age_in_years(edf.patient.birthdate, edf.recording.startdate)
     original_sex = edf.patient.sex
     original_starttime = edf.starttime
