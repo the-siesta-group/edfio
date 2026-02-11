@@ -3,7 +3,7 @@
 ## Unreleased
 
 ### Added
-- Add `keep_age`, `keep_sex`, and `keep_starttime` parameters to `Edf.anonymize()` for optionally keeping these fields when anonymizing an EDF/BDF record ([#100](https://github.com/the-siesta-group/edfio/pull/100)).
+- Add `keep_age`, `keep_sex`, and `keep_starttime` parameters to `Edf.anonymize()` for optionally keeping these fields when anonymizing an EDF/BDF record ([#100](https://github.com/the-siesta-group/edfio/pull/100) by [Clemens Brunner](https://github.com/cbrnr)).
 
 ## [0.4.12] - 2026-01-20
 
@@ -31,15 +31,15 @@
 ## [0.4.8] - 2025-03-26
 
 ### Added
-- Add a parameter `header_encoding="ascii"` to `read_edf()` to support reading header fields that use a character encoding different to ASCII ([#68](https://github.com/the-siesta-group/edfio/pull/68)).
+- Add a parameter `header_encoding="ascii"` to `read_edf()` to support reading header fields that use a character encoding different to ASCII ([#68](https://github.com/the-siesta-group/edfio/pull/68) by [JohnAtl](https://github.com/JohnAtl)).
 
 ### Fixed
-- Use ASCII instead of UTF-8 as the default character encoding for reading header fields ([#68](https://github.com/the-siesta-group/edfio/pull/68)).
+- Use ASCII instead of UTF-8 as the default character encoding for reading header fields ([#68](https://github.com/the-siesta-group/edfio/pull/68) by [JohnAtl](https://github.com/JohnAtl)).
 
 ## [0.4.7] - 2025-03-21
 
 ### Fixed
-- Allow having annotations with and without durations in the same recording ([#67](https://github.com/the-siesta-group/edfio/pull/67)).
+- Allow having annotations with and without durations in the same recording ([#67](https://github.com/the-siesta-group/edfio/pull/67) by [JohnAtl](https://github.com/JohnAtl)).
 
 ## [0.4.6] - 2025-02-27
 
