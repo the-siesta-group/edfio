@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## [0.4.13] - 2026-02-11
+
 ### Added
 - Add `keep_age`, `keep_sex`, and `keep_starttime` parameters to `Edf.anonymize()` for optionally keeping these fields when anonymizing an EDF/BDF record ([#100](https://github.com/the-siesta-group/edfio/pull/100) by [Clemens Brunner](https://github.com/cbrnr)).
 
