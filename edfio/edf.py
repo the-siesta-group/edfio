@@ -207,12 +207,10 @@ class _Base(Generic[_Signal]):
         *,
         lazy_load_data: bool,
     ) -> None:
-        if lazy_load_data and (
-            self._signal_class == BdfSignal or not isinstance(file, Path)
-        ):
+        if lazy_load_data and self._signal_class == BdfSignal:
             raise ValueError(
-                "Lazy loading is only supported for local file paths in EDF format, "
-                f"got {type(file)} for {self._fmt} format"
+                f"Lazy loading is not supported for {self._fmt} format, "
+                f"got {type(file)}"
             )
         lens = [signal.samples_per_data_record for signal in self._signals]
         datarecord_len = sum(lens)

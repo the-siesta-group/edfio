@@ -1347,13 +1347,36 @@ def test_read_edf_with_invalid_number_of_records(
 # fmt: on
 
 
+@pytest.mark.bdf
+def test_fail_lazy_load_bdf():
+    from edfio.edf import _read_file
+
+    bdf_data = EDF_FILE.read_bytes()
+    with pytest.raises(ValueError, match="Lazy loading is not supported for BDF"):
+        _read_file(
+            bdf_data, lazy_load_data=True, header_encoding="ascii", class_=Bdf
+        )
+
+
 @pytest.mark.edf
-def test_fail_lazy_load():
+def test_lazy_load_bytes():
     edf_data = EDF_FILE.read_bytes()
-    with pytest.raises(
-        ValueError, match="Lazy loading is only supported for local file paths"
-    ):
-        read_edf(edf_data, lazy_load_data=True)
+    edf = read_edf(edf_data, lazy_load_data=True)
+    assert len(edf.signals) > 0
+    for signal in edf.signals:
+        assert signal._digital is None
+        assert signal._lazy_loader is not None
+    comparison_edf = read_edf(EDF_FILE)
+    for signal, comparison_signal in zip(edf.signals, comparison_edf.signals):
+        np.testing.assert_array_equal(signal.data, comparison_signal.data)
+
+
+@pytest.mark.edf
+def test_lazy_load_bytesio():
+    edf = read_edf(io.BytesIO(EDF_FILE.read_bytes()), lazy_load_data=True)
+    comparison_edf = read_edf(EDF_FILE)
+    for signal, comparison_signal in zip(edf.signals, comparison_edf.signals):
+        np.testing.assert_array_equal(signal.data, comparison_signal.data)
 
 
 def test_lazy_loading_defaults_to_false_for_non_paths():
