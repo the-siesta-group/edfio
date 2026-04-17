@@ -1353,9 +1353,7 @@ def test_fail_lazy_load_bdf():
 
     bdf_data = EDF_FILE.read_bytes()
     with pytest.raises(ValueError, match="Lazy loading is not supported for BDF"):
-        _read_file(
-            bdf_data, lazy_load_data=True, header_encoding="ascii", class_=Bdf
-        )
+        _read_file(bdf_data, lazy_load_data=True, header_encoding="ascii", class_=Bdf)
 
 
 @pytest.mark.edf
