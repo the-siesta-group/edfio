@@ -1352,13 +1352,17 @@ def test_fail_lazy_load_bdf():
     from edfio.edf import _read_file
 
     bdf_data = EDF_FILE.read_bytes()
-    with pytest.raises(ValueError, match="Lazy loading is not supported for BDF"):
+    with pytest.raises(
+        ValueError,
+        match="Lazy loading is only supported for local file paths and bytes-like objects",
+    ):
         _read_file(bdf_data, lazy_load_data=True, header_encoding="ascii", class_=Bdf)
 
 
 @pytest.mark.edf
-def test_lazy_load_bytes():
-    edf_data = EDF_FILE.read_bytes()
+@pytest.mark.parametrize("wrap", [bytes, bytearray, memoryview])
+def test_lazy_load_bytes_like(wrap):
+    edf_data = wrap(EDF_FILE.read_bytes())
     edf = read_edf(edf_data, lazy_load_data=True)
     assert len(edf.signals) > 0
     for signal in edf.signals:
@@ -1370,16 +1374,48 @@ def test_lazy_load_bytes():
 
 
 @pytest.mark.edf
-def test_lazy_load_bytesio():
-    edf = read_edf(io.BytesIO(EDF_FILE.read_bytes()), lazy_load_data=True)
-    comparison_edf = read_edf(EDF_FILE)
-    for signal, comparison_signal in zip(edf.signals, comparison_edf.signals):
-        np.testing.assert_array_equal(signal.data, comparison_signal.data)
+def test_lazy_load_bytes_is_zero_copy():
+    # The lazy-loader's numpy buffer must share memory with the user-provided
+    # bytes — no intermediate copy anywhere in the read path.
+    raw = EDF_FILE.read_bytes()
+    edf = read_edf(raw, lazy_load_data=True)
+    loader_buffer = edf.signals[0]._lazy_loader.buffer
+    tail = np.frombuffer(raw, dtype=np.uint8)[edf.bytes_in_header_record :]
+    assert np.shares_memory(loader_buffer, tail)
 
 
-def test_lazy_loading_defaults_to_false_for_non_paths():
-    edf_data = EDF_FILE.read_bytes()
-    edf = read_edf(edf_data)
+@pytest.mark.edf
+def test_fail_lazy_load_bytesio():
+    with pytest.raises(
+        ValueError,
+        match="Lazy loading is only supported for local file paths and bytes-like objects",
+    ):
+        read_edf(io.BytesIO(EDF_FILE.read_bytes()), lazy_load_data=True)
+
+
+@pytest.mark.edf
+def test_fail_lazy_load_buffered_reader(tmp_path):
+    file = tmp_path / "stream.edf"
+    file.write_bytes(EDF_FILE.read_bytes())
+    with file.open("rb") as stream:
+        with pytest.raises(
+            ValueError,
+            match="Lazy loading is only supported for local file paths and bytes-like objects",
+        ):
+            read_edf(stream, lazy_load_data=True)
+
+
+@pytest.mark.edf
+def test_lazy_loading_auto_enabled_for_bytes():
+    edf = read_edf(EDF_FILE.read_bytes())
+    assert len(edf.signals) > 0
+    for signal in edf.signals:
+        assert signal._digital is None
+        assert signal._lazy_loader is not None
+
+
+def test_lazy_loading_auto_disabled_for_streams():
+    edf = read_edf(io.BytesIO(EDF_FILE.read_bytes()))
     assert len(edf.signals) > 0
     for signal in edf.signals:
         assert signal._digital is not None
