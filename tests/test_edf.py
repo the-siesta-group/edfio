@@ -1333,7 +1333,11 @@ def test_read_edf_with_invalid_number_of_records(
             file.seek(0, 2)
             file.write(b"\0" * extra_bytes)
 
-    for io_obj in (tmp_file, tmp_file.read_bytes()):
+    for io_obj in (
+        tmp_file,
+        tmp_file.read_bytes(),
+        io.BytesIO(tmp_file.read_bytes()),
+    ):
         if expected_warning is None:
             ctx = nullcontext()
         else:
