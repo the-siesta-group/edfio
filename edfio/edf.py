@@ -198,22 +198,16 @@ class _Base(Generic[_Signal]):
     def local_recording_identification(self, value: str) -> None:
         self._local_recording_identification = encode_str(value, 80)
 
-    def _load_data(  # noqa: PLR0912
+    def _load_data(  # noqa: PLR0912, PLR0915
         self,
         file: Path
         | io.BufferedReader
         | io.BytesIO
+        | memoryview
         | tempfile.SpooledTemporaryFile[bytes],
         *,
         lazy_load_data: bool,
     ) -> None:
-        if lazy_load_data and (
-            self._signal_class == BdfSignal or not isinstance(file, Path)
-        ):
-            raise ValueError(
-                "Lazy loading is only supported for local file paths in EDF format, "
-                f"got {type(file)} for {self._fmt} format"
-            )
         lens = [signal.samples_per_data_record for signal in self._signals]
         datarecord_len = sum(lens)
         truncated = False
@@ -223,6 +217,9 @@ class _Base(Generic[_Signal]):
             if isinstance(file, Path):
                 remaining_bytes = file.stat().st_size - self.bytes_in_header_record
                 data_bytes = file.read_bytes()[self.bytes_in_header_record :]
+            elif isinstance(file, memoryview):
+                data_bytes = file
+                remaining_bytes = len(data_bytes)
             else:
                 data_bytes = file.read()
                 remaining_bytes = len(data_bytes)
@@ -239,6 +236,13 @@ class _Base(Generic[_Signal]):
             # 24th bit determines the sign
             datarecords[datarecords >= (1 << 23)] -= 1 << 24
             datarecords.shape = (actual_records, datarecord_len)
+        elif isinstance(file, memoryview):
+            actual_records = len(file) // (datarecord_len * 2)
+            if actual_records * datarecord_len * 2 < len(file):
+                truncated = True
+            datarecords = np.frombuffer(  # type: ignore[assignment]
+                file, dtype=np.int16, count=actual_records * datarecord_len
+            ).reshape(actual_records, datarecord_len)
         elif not isinstance(file, Path):
             data_bytes = file.read()
             actual_records = len(data_bytes) // (datarecord_len * 2)
@@ -1274,24 +1278,41 @@ def _read_file(
     | io.BufferedReader
     | io.BytesIO
     | bytes
+    | bytearray
+    | memoryview
     | tempfile.SpooledTemporaryFile[bytes],
     *,
     lazy_load_data: bool,
     header_encoding: str,
     class_: type[_T],
 ) -> _T:
+    if lazy_load_data and (
+        class_ is Bdf or not isinstance(file, (Path, str, bytes, bytearray, memoryview))
+    ):
+        raise ValueError(
+            "Lazy loading is only supported for local file paths and "
+            f"bytes-like objects in EDF format, got {type(file)} for "
+            f"{class_._fmt} format"
+        )
     if isinstance(file, str):
         file = Path(file)
-    if isinstance(file, bytes):
-        file = io.BytesIO(file)
 
     rec = object.__new__(class_)
-    if isinstance(file, Path):
+    if isinstance(file, (bytes, bytearray, memoryview)):
+        # Wrap in BytesIO for the tiny header read (cheap, no copy), then pass
+        # the data portion to `_load_data` as a memoryview into the original
+        # bytes-like object — `np.frombuffer` consumes it zero-copy.
+        header_reader = io.BytesIO(file)
+        rec._read_header(header_reader, header_encoding)
+        data = memoryview(file)[rec.bytes_in_header_record :]
+        rec._load_data(data, lazy_load_data=lazy_load_data)
+    elif isinstance(file, Path):
         with file.expanduser().open("rb") as f:
             rec._read_header(f, header_encoding)
+        rec._load_data(file, lazy_load_data=lazy_load_data)
     else:
         rec._read_header(file, header_encoding)
-    rec._load_data(file, lazy_load_data=lazy_load_data)
+        rec._load_data(file, lazy_load_data=lazy_load_data)
     return rec
 
 
@@ -1301,6 +1322,8 @@ def read_edf(
     | io.BufferedReader
     | io.BytesIO
     | bytes
+    | bytearray
+    | memoryview
     | tempfile.SpooledTemporaryFile[bytes],
     lazy_load_data: bool | Literal["auto"] = "auto",
     *,
@@ -1313,13 +1336,16 @@ def read_edf(
 
     Parameters
     ----------
-    edf_file : Path | str | io.BufferedReader | io.BytesIO
-        The file location (path object or string) or file-like object to read from.
+    edf_file : Path | str | io.BufferedReader | io.BytesIO | bytes | bytearray | memoryview
+        The file location (path object or string), file-like object, or bytes-like
+        object to read from.
     lazy_load_data : bool | {"auto"}, default: "auto"
         If `True`, the raw signal data is not loaded into memory until it is accessed. If `False`,
         the data is loaded immediately. If `"auto"`, the data is loaded lazily if
-        the specified edf_file represents a local path and the extension is not ".bdf"
-        and eagerly otherwise.
+        `edf_file` is a local path or a bytes-like object (`bytes`, `bytearray`, or
+        `memoryview`), and eagerly otherwise. Lazy loading is not supported for
+        stream-like objects (`io.BufferedReader`, `io.BytesIO`, etc.) or the BDF
+        format.
     header_encoding : str, default: "ascii"
         The character encoding to use when reading header fields.
 
@@ -1329,7 +1355,7 @@ def read_edf(
         The resulting :class:`Edf` object.
     """
     if lazy_load_data == "auto":
-        lazy_load_data = isinstance(edf_file, (Path, str))
+        lazy_load_data = isinstance(edf_file, (Path, str, bytes, bytearray, memoryview))
     return _read_file(
         edf_file,
         lazy_load_data=lazy_load_data,
@@ -1344,6 +1370,8 @@ def read_bdf(
     | io.BufferedReader
     | io.BytesIO
     | bytes
+    | bytearray
+    | memoryview
     | tempfile.SpooledTemporaryFile[bytes],
     *,
     header_encoding: str = "ascii",
