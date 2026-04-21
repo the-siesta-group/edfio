@@ -113,7 +113,7 @@ def _create_annotations_signal(
     )
     signal._label = f"{signal_class._fmt} Annotations ".encode()
     signal._set_samples_per_data_record(maxlen // bytes_per_sample)
-    signal._digital = np.frombuffer(raw, dtype=np.uint8).copy()
+    signal._digital = np.frombuffer(raw, dtype=np.uint8).copy()  # type: ignore[assignment]
     return signal  # type: ignore[return-value]
 
 

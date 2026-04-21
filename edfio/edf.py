@@ -240,7 +240,7 @@ class _Base(Generic[_Signal]):
             actual_records = len(file) // (datarecord_len * 2)
             if actual_records * datarecord_len * 2 < len(file):
                 truncated = True
-            datarecords = np.frombuffer(
+            datarecords = np.frombuffer(  # type: ignore[assignment]
                 file, dtype=np.int16, count=actual_records * datarecord_len
             ).reshape(actual_records, datarecord_len)
         elif not isinstance(file, Path):
@@ -280,13 +280,13 @@ class _Base(Generic[_Signal]):
 
         for signal, start, end in zip(self._signals, starts, ends):
             if lazy_load_data:
-                signal._lazy_loader = LazyLoader(datarecords, start, end)
+                signal._lazy_loader = LazyLoader(datarecords, start, end)  # type: ignore[type-var, assignment]
             elif signal.label == "BDF Annotations":
                 digital = datarecords[:, start:end].flatten()
                 digital = digital.view(np.uint8).reshape(-1, 4)[:, :3].flatten()
-                signal._digital = digital
+                signal._digital = digital  # type: ignore[assignment]
             else:
-                signal._digital = datarecords[:, start:end].flatten()
+                signal._digital = datarecords[:, start:end].flatten()  # type: ignore[assignment]
 
     def _read_header(
         self,
@@ -596,7 +596,7 @@ class _Base(Generic[_Signal]):
                 annotation_signal._sampling_frequency = (
                     maxlen // bytes_per_sample * self.data_record_duration
                 )
-                annotation_signal._digital = np.frombuffer(raw, dtype=np.uint8)
+                annotation_signal._digital = np.frombuffer(raw, dtype=np.uint8)  # type: ignore[assignment]
 
     def _set_startdate_with_recording(self, recording: Recording) -> None:
         try:
