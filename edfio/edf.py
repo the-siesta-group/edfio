@@ -238,7 +238,7 @@ class _Base(Generic[_Signal]):
             )
             # 24th bit determines the sign
             datarecords[datarecords >= (1 << 23)] -= 1 << 24
-            datarecords.shape = (actual_records, datarecord_len)
+            datarecords = datarecords.reshape(actual_records, datarecord_len)
         elif not isinstance(file, Path):
             data_bytes = file.read()
             actual_records = len(data_bytes) // (datarecord_len * 2)
@@ -247,7 +247,7 @@ class _Base(Generic[_Signal]):
             datarecords = np.frombuffer(
                 data_bytes, dtype=np.int16, count=actual_records * datarecord_len
             )
-            datarecords.shape = (actual_records, datarecord_len)
+            datarecords = datarecords.reshape(actual_records, datarecord_len)
         else:
             remaining_bytes = file.stat().st_size - self.bytes_in_header_record
             actual_records = remaining_bytes // (datarecord_len * 2)

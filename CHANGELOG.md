@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+### Fixed
+- Use `.reshape` instead of setting `.shape` which is deprecated in NumPy v2.5.0 ([#98](https://github.com/the-siesta-group/edfio/pull/106)).
+
 ## [0.4.13] - 2026-02-11
 
 ### Added
