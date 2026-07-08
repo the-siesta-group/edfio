@@ -1,11 +1,9 @@
 name: Test
 
 on:
-  push:
-    paths-ignore:
-      - 'docs/**'
-      - '**/*.md'
+  workflow_dispatch:
   workflow_call:
+  pull_request:
 
 jobs:
   pre-commit:
