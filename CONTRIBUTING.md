@@ -29,9 +29,9 @@ Before you start working on your contribution, please make sure to follow the gu
 ## Development environment
 We suggest to use [`uv`](https://docs.astral.sh/uv/getting-started/installation/) for managing project dependencies, but any other standard-compliant tool will work too.
 
-Create a virtual environment with Python 3.9 and install all dependencies:
+Create a virtual environment and install all dependencies:
 
-    uv sync --python=3.9
+    uv sync
 
 **When using `uv`, prepend the commands below with `uv run` to make sure they are executed in the virtual environment!**
 
