@@ -887,7 +887,7 @@ class _Base(Generic[_Signal]):
                 .tals[0]
                 .onset
             )
-            if onset != prev_onset + data_record_duration:
+            if onset != round(prev_onset + data_record_duration, 12):
                 return False
             prev_onset = onset
         return True

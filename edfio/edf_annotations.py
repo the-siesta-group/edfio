@@ -80,7 +80,6 @@ def _create_annotations_signal(
     with_timestamps: bool = True,
     subsecond_offset: float = 0,
 ) -> _Signal:
-    bytes_per_sample = signal_class._bytes_per_sample
     data_record_starts = np.arange(num_data_records) * data_record_duration
     # list.pop() is O(1) and list.pop(0) is O(n), so using a reversed list is faster
     annotations = sorted(annotations, reverse=True)
@@ -102,6 +101,17 @@ def _create_annotations_signal(
                 )
             )
         data_records.append(_EdfAnnotationsDataRecord(tals).to_bytes())
+    return _data_records_to_annotations_signal(
+        data_records, signal_class, data_record_duration
+    )
+
+
+def _data_records_to_annotations_signal(
+    data_records: list[bytes],
+    signal_class: type[_Signal],
+    data_record_duration: float,
+) -> _Signal:
+    bytes_per_sample = signal_class._bytes_per_sample
     maxlen = max(len(data_record) for data_record in data_records)
     maxlen = math.ceil(maxlen / bytes_per_sample) * bytes_per_sample
     raw = b"".join(dr.ljust(maxlen, b"\x00") for dr in data_records)

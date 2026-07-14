@@ -14,7 +14,9 @@ from edfio import (
 )
 from edfio.edf_annotations import (
     _create_annotations_signal,
+    _data_records_to_annotations_signal,
     _EdfAnnotationsDataRecord,
+    _EdfTAL,
     _encode_annotation_duration,
     _encode_annotation_onset,
 )
@@ -563,24 +565,21 @@ def test_edf_without_annotations_is_continuous():
         ((0, 2, 4, 6), 2, True),
         ((3, 5, 7, 9), 2, True),
         ((0, 2, 5, 7), 2, False),
+        ((0.0, 0.1, 0.2, 0.3), 0.1, True),
+        ((0.1, 0.2, 0.3, 0.4), 0.1, True),
+        ((0.1, 0.2, 0.4, 0.5), 0.1, False),
     ],
 )
 def test_is_continuous(onsets, expected, data_record_duration):
-    # create_annotations_signal puts the annotations into the correct data records by
-    # onset, so for a discontinuous timekeeping signal we have to work around this:
-    annotations_signal = _create_annotations_signal(
-        [],
-        signal_class=EdfSignal,
-        num_data_records=len(onsets),
-        data_record_duration=data_record_duration,
-        with_timestamps=True,
+    annotations_signal = _data_records_to_annotations_signal(
+        [_EdfAnnotationsDataRecord([_EdfTAL(o, None, [])]).to_bytes() for o in onsets],
+        EdfSignal,
+        data_record_duration,
     )
-    annotations_data = b"".join(f"{o:+}\x14\x14\x00\x00".encode() for o in onsets)
-    annotations_signal._digital = np.frombuffer(annotations_data, np.uint8)
 
     edf = Edf(
         [
-            EdfSignal(np.arange(4 * data_record_duration), 1),
+            EdfSignal(np.arange(len(onsets)), 1 / data_record_duration),
             annotations_signal,
         ],
         data_record_duration=data_record_duration,
