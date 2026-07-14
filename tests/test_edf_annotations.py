@@ -10,6 +10,7 @@ from edfio import (
     Edf,
     EdfAnnotation,
     EdfSignal,
+    Recording,
     read_edf,
 )
 from edfio.edf_annotations import (
@@ -450,6 +451,25 @@ def test_starttime_with_subsecond_offset(offset: float, expected: datetime.time)
     )
     edf._reserved = f"{edf._fmt}+C".ljust(44).encode()
     assert edf.starttime == expected
+
+
+def test_startdate_where_subsecond_offsets_shifts_past_midnight():
+    edf = Edf(
+        [
+            EdfSignal(np.arange(1), 1),
+            _create_annotations_signal(
+                [EdfAnnotation(10, None, "")],
+                signal_class=EdfSignal,
+                num_data_records=1,
+                data_record_duration=1,
+                with_timestamps=False,
+            ),
+        ],
+        recording=Recording(startdate=datetime.date(2026, 7, 14)),
+        starttime=datetime.time(23, 59, 55),
+    )
+    assert edf.starttime == datetime.time(0, 0, 5)
+    assert edf.startdate == datetime.date(2026, 7, 15)
 
 
 def test_edf_anonymized_does_not_remove_annotations():

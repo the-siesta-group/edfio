@@ -523,11 +523,17 @@ class _Base(Generic[_Signal]):
                     f"Different values in startdate fields: {legacy_startdate}, {self.recording.startdate}"
                 )
         try:
-            return self.recording.startdate
+            startdate = self.recording.startdate
         except AnonymizedDateError:
             raise
         except ValueError:
-            return legacy_startdate
+            startdate = legacy_startdate
+        if subsecond_offset := self._subsecond_offset:
+            return (
+                datetime.datetime.combine(startdate, decode_time(self._starttime))
+                + datetime.timedelta(seconds=subsecond_offset)
+            ).date()
+        return startdate
 
     @startdate.setter
     def startdate(self, startdate: datetime.date) -> None:
