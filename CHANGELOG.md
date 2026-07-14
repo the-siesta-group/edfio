@@ -6,7 +6,7 @@
 - Allow getting the recording starttime when the very first EDF+ timekeeping annotation has an onset >=1 second ([#108](https://github.com/the-siesta-group/edfio/pull/108)).
 
 ### Fixed
-- Use `.reshape` instead of setting `.shape` which is deprecated in NumPy v2.5.0 ([#98](https://github.com/the-siesta-group/edfio/pull/106)).
+- Use `.reshape` instead of setting `.shape` which is deprecated in NumPy v2.5.0 ([#106](https://github.com/the-siesta-group/edfio/pull/106)).
 
 ## [0.4.13] - 2026-02-11
 
