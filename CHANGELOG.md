@@ -4,6 +4,7 @@
 
 ### Added
 - Allow getting the recording starttime when the very first EDF+ timekeeping annotation has an onset >=1 second ([#108](https://github.com/the-siesta-group/edfio/pull/108)).
+- Add a property `is_continuous` which returns False for EDF+ files where not all onsets of data records coincide with the ends of the preceding ones ([#108](https://github.com/the-siesta-group/edfio/pull/108)).
 
 ### Fixed
 - Use `.reshape` instead of setting `.shape` which is deprecated in NumPy v2.5.0 ([#106](https://github.com/the-siesta-group/edfio/pull/106)).

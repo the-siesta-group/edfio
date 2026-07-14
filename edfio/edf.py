@@ -860,6 +860,39 @@ class _Base(Generic[_Signal]):
         return next(iter(self._annotation_signals))
 
     @property
+    def is_continuous(self) -> bool:
+        """
+        Whether the recording is continuous, based on EDF+ timekeeping annotations.
+
+        According to the EDF+ specification, a recording is continuous if the starttime
+        of each data record coincides with the end (starttime + duration) of the
+        preceding one.
+
+        Returns
+        -------
+        bool
+            True if the recording is continuous, False otherwise.
+        """
+        try:
+            timekeeping_signal = self._timekeeping_signal
+        except StopIteration:
+            return True
+        prev_onset = self._subsecond_offset
+        data_record_duration = self.data_record_duration
+        for data_record in timekeeping_signal.digital.reshape(
+            (-1, timekeeping_signal._bytes_per_data_record)
+        )[1:]:
+            onset = (
+                _EdfAnnotationsDataRecord.from_bytes(data_record.tobytes())
+                .tals[0]
+                .onset
+            )
+            if onset != prev_onset + data_record_duration:
+                return False
+            prev_onset = onset
+        return True
+
+    @property
     def duration(self) -> float:
         """Recording duration in seconds."""
         return self.num_data_records * self.data_record_duration

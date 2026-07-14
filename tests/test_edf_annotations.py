@@ -547,3 +547,42 @@ def test_mixture_of_annotations_with_and_without_durations():
         EdfAnnotation(0.2, 0.5, "B"),
         EdfAnnotation(0.7, None, "C"),
     )
+
+
+def test_edf_without_annotations_is_continuous():
+    edf = Edf([EdfSignal(np.arange(4), 1)])
+    assert edf.is_continuous is True
+
+
+@pytest.mark.parametrize(
+    ("onsets", "data_record_duration", "expected"),
+    [
+        ((0, 1, 2, 3), 1, True),
+        ((2, 3, 4, 5), 1, True),
+        ((0, 1, 3, 4), 1, False),
+        ((0, 2, 4, 6), 2, True),
+        ((3, 5, 7, 9), 2, True),
+        ((0, 2, 5, 7), 2, False),
+    ],
+)
+def test_is_continuous(onsets, expected, data_record_duration):
+    # create_annotations_signal puts the annotations into the correct data records by
+    # onset, so for a discontinuous timekeeping signal we have to work around this:
+    annotations_signal = _create_annotations_signal(
+        [],
+        signal_class=EdfSignal,
+        num_data_records=len(onsets),
+        data_record_duration=data_record_duration,
+        with_timestamps=True,
+    )
+    annotations_data = b"".join(f"{o:+}\x14\x14\x00\x00".encode() for o in onsets)
+    annotations_signal._digital = np.frombuffer(annotations_data, np.uint8)
+
+    edf = Edf(
+        [
+            EdfSignal(np.arange(4 * data_record_duration), 1),
+            annotations_signal,
+        ],
+        data_record_duration=data_record_duration,
+    )
+    assert edf.is_continuous == expected
