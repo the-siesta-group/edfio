@@ -558,15 +558,11 @@ class _Base(Generic[_Signal]):
 
         In EDF+ files, microsecond accuracy is supported.
         """
+        starttime = decode_time(self._starttime)
         subsecond_offset = self._subsecond_offset
-        try:
-            return decode_time(self._starttime).replace(
-                microsecond=round(subsecond_offset * 1000000)
-            )
-        except ValueError as e:
-            raise ValueError(
-                f"Subsecond offset in first annotation must be 0.X, is {subsecond_offset}"
-            ) from e
+        dummy_datetime = datetime.datetime.combine(datetime.date(1, 1, 1), starttime)
+        dummy_datetime += datetime.timedelta(seconds=subsecond_offset)
+        return dummy_datetime.time()
 
     @starttime.setter
     def starttime(self, starttime: datetime.time) -> None:

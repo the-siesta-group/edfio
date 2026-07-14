@@ -423,12 +423,22 @@ def test_high_numbers_of_annotations_are_possible(tmp_file: Path):
     assert len(read_edf(tmp_file).annotations) == fs
 
 
-def test_starttime_raises_helpful_error_for_invalid_timestamp_annotation():
+@pytest.mark.parametrize(
+    ("offset", "expected"),
+    [
+        (0, datetime.time(0, 0, 0)),
+        (1, datetime.time(0, 0, 1)),
+        (2.345, datetime.time(0, 0, 2, 345000)),
+        (2.345678, datetime.time(0, 0, 2, 345678)),
+        (2.3456789, datetime.time(0, 0, 2, 345679)),
+    ],
+)
+def test_starttime_with_subsecond_offset(offset: float, expected: datetime.time):
     edf = Edf(
         [
             EdfSignal(np.arange(1), 1),
             _create_annotations_signal(
-                [EdfAnnotation(2.345, None, "")],
+                [EdfAnnotation(offset, None, "")],
                 signal_class=EdfSignal,
                 num_data_records=1,
                 data_record_duration=1,
@@ -437,8 +447,7 @@ def test_starttime_raises_helpful_error_for_invalid_timestamp_annotation():
         ]
     )
     edf._reserved = f"{edf._fmt}+C".ljust(44).encode()
-    with pytest.raises(ValueError, match="Subsecond offset in first annotation must"):
-        edf.starttime
+    assert edf.starttime == expected
 
 
 def test_edf_anonymized_does_not_remove_annotations():
