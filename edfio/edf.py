@@ -523,11 +523,17 @@ class _Base(Generic[_Signal]):
                     f"Different values in startdate fields: {legacy_startdate}, {self.recording.startdate}"
                 )
         try:
-            return self.recording.startdate
+            startdate = self.recording.startdate
         except AnonymizedDateError:
             raise
         except ValueError:
-            return legacy_startdate
+            startdate = legacy_startdate
+        if subsecond_offset := self._subsecond_offset:
+            return (
+                datetime.datetime.combine(startdate, decode_time(self._starttime))
+                + datetime.timedelta(seconds=subsecond_offset)
+            ).date()
+        return startdate
 
     @startdate.setter
     def startdate(self, startdate: datetime.date) -> None:
@@ -558,15 +564,11 @@ class _Base(Generic[_Signal]):
 
         In EDF+ files, microsecond accuracy is supported.
         """
+        starttime = decode_time(self._starttime)
         subsecond_offset = self._subsecond_offset
-        try:
-            return decode_time(self._starttime).replace(
-                microsecond=round(subsecond_offset * 1000000)
-            )
-        except ValueError as e:
-            raise ValueError(
-                f"Subsecond offset in first annotation must be 0.X, is {subsecond_offset}"
-            ) from e
+        dummy_datetime = datetime.datetime.combine(datetime.date(1, 1, 1), starttime)
+        dummy_datetime += datetime.timedelta(seconds=subsecond_offset)
+        return dummy_datetime.time()
 
     @starttime.setter
     def starttime(self, starttime: datetime.time) -> None:
@@ -862,6 +864,39 @@ class _Base(Generic[_Signal]):
     @property
     def _timekeeping_signal(self) -> _Signal:
         return next(iter(self._annotation_signals))
+
+    @property
+    def is_continuous(self) -> bool:
+        """
+        Whether the recording is continuous, based on EDF+ timekeeping annotations.
+
+        According to the EDF+ specification, a recording is continuous if the starttime
+        of each data record coincides with the end (starttime + duration) of the
+        preceding one.
+
+        Returns
+        -------
+        bool
+            True if the recording is continuous, False otherwise.
+        """
+        try:
+            timekeeping_signal = self._timekeeping_signal
+        except StopIteration:
+            return True
+        prev_onset = self._subsecond_offset
+        data_record_duration = self.data_record_duration
+        for data_record in timekeeping_signal.digital.reshape(
+            (-1, timekeeping_signal._bytes_per_data_record)
+        )[1:]:
+            onset = (
+                _EdfAnnotationsDataRecord.from_bytes(data_record.tobytes())
+                .tals[0]
+                .onset
+            )
+            if onset != round(prev_onset + data_record_duration, 12):
+                return False
+            prev_onset = onset
+        return True
 
     @property
     def duration(self) -> float:
