@@ -329,7 +329,7 @@ class _Base(Generic[_Signal]):
             num_data_records = 1
         else:
             signal_durations = [
-                round(s._num_samples / s.sampling_frequency, 12) for s in signals
+                round(s._num_samples / s.sampling_frequency, 9) for s in signals
             ]
             if any(v != signal_durations[0] for v in signal_durations[1:]):
                 raise ValueError(
@@ -583,7 +583,7 @@ class _Base(Generic[_Signal]):
                 ):
                     ann_dr = _EdfAnnotationsDataRecord.from_bytes(data_record.tobytes())
                     for tal in ann_dr.tals:
-                        tal.onset = round(tal.onset + onset_change, 12)
+                        tal.onset = round(tal.onset + onset_change, 9)
                     data_records.append(ann_dr.to_bytes())
                 maxlen = max(len(data_record) for data_record in data_records)
                 maxlen = math.ceil(maxlen / bytes_per_sample) * bytes_per_sample
@@ -951,7 +951,7 @@ class _Base(Generic[_Signal]):
         subsecond_offset = self._subsecond_offset
         annotations = [
             EdfAnnotation(
-                round(ann.onset - subsecond_offset, 12), ann.duration, ann.text
+                round(ann.onset - subsecond_offset, 9), ann.duration, ann.text
             )
             for ann in annotations
         ]
@@ -1192,7 +1192,7 @@ class _Base(Generic[_Signal]):
             else:
                 annotations.extend(annot_dr.annotations)
         annotations = [
-            EdfAnnotation(round(a.onset - start, 12), a.duration, a.text)
+            EdfAnnotation(round(a.onset - start, 9), a.duration, a.text)
             for a in annotations
             if keep_all_annotations or start <= a.onset < stop
         ]
