@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## [0.4.14] - 2026-07-15
+
 ### Added
 - Allow getting the recording starttime when the very first EDF+ timekeeping annotation has an onset >=1 second ([#108](https://github.com/the-siesta-group/edfio/pull/108)).
 - Add a property `is_continuous` which returns False for EDF+ files where not all onsets of data records coincide with the ends of the preceding ones ([#108](https://github.com/the-siesta-group/edfio/pull/108)).
