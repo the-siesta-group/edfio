@@ -22,19 +22,19 @@ _ANNOTATIONS_PATTERN = re.compile(
 
 
 def _encode_annotation_onset(onset: float) -> str:
-    string = f"{onset:+.12f}".rstrip("0")
-    if string[-1] == ".":
-        return string[:-1]
-    return string
+    # Use the shortest decimal string that round-trips to the same float, in
+    # positional (non-scientific) notation as required by EDF+. A fixed-precision
+    # format such as f"{onset:+.12f}" exposes binary rounding noise once the
+    # integer part is large (e.g. 8192.202312 -> "+8192.202311999999"), producing
+    # an onset that drifts from the intended sub-second offset and is rejected by
+    # strict EDF+ readers.
+    return np.format_float_positional(onset, unique=True, trim="-", sign=True)
 
 
 def _encode_annotation_duration(duration: float) -> str:
     if duration < 0:
         raise ValueError(f"Annotation duration must be positive, is {duration}")
-    string = f"{duration:.12f}".rstrip("0")
-    if string[-1] == ".":
-        return string[:-1]
-    return string
+    return np.format_float_positional(duration, unique=True, trim="-")
 
 
 class EdfAnnotation(NamedTuple):
