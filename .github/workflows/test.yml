@@ -50,7 +50,5 @@ jobs:
         with:
           enable-cache: true
           cache-dependency-glob: "**/pyproject.toml"
-      - name: Install Python ${{ matrix.python-version }}
-        run: uv python install ${{ matrix.python-version }}
       - name: Pytest
         run: uv run --python=${{matrix.python-version}} --with ${{ matrix.numpy }} pytest
