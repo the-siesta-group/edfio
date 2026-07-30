@@ -31,7 +31,7 @@ We suggest to use [`uv`](https://docs.astral.sh/uv/getting-started/installation/
 
 Create a virtual environment with Python 3.9 and install all dependencies:
 
-    uv sync --python=3.9
+    uv sync
 
 **When using `uv`, prepend the commands below with `uv run` to make sure they are executed in the virtual environment!**
 
@@ -40,10 +40,6 @@ Create a virtual environment with Python 3.9 and install all dependencies:
 To run the tests, in the project or package root execute
 
     pytest
-
-Make sure all lines are covered by tests with
-
-    pytest --cov
 
 > [!NOTE]
 > Tests are automatically run for both EDF and BDF.
