@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## [0.4.15] - 2026-07-30
+
 ### Fixed
 - Encode annotation onsets and durations using the shortest round-trippable decimal, avoiding binary rounding noise that corrupted the sub-second start offset of long EDF+ recordings and made them unreadable by strict EDF+ readers ([#109](https://github.com/the-siesta-group/edfio/pull/109)).
 
