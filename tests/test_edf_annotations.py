@@ -103,7 +103,11 @@ def test_long_recording_with_subsecond_starttime_roundtrip(tmp_file: Path):
     starttime = datetime.time(23, 20, 20, 202312)
     edf = Edf([EdfSignal(np.zeros(duration_s), 1)], starttime=starttime)
     edf.write(tmp_file)
-    assert read_edf(tmp_file).starttime == starttime
+    edf = read_edf(tmp_file)
+    assert edf.starttime == starttime
+    signal = edf._signals[1]
+    last_data_record = signal.digital.reshape(-1, signal._bytes_per_data_record)[-1]
+    assert last_data_record.tobytes().startswith(b"+8192.202312")
 
 
 def test_edf_annotations():
