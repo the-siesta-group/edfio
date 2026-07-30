@@ -101,7 +101,8 @@ def test_long_recording_with_subsecond_starttime_roundtrip(tmp_file: Path):
     # corrupting the sub-second offset. Ensure the offset round-trips exactly.
     duration_s = 8193
     starttime = datetime.time(23, 20, 20, 202312)
-    edf = Edf([EdfSignal(np.zeros(duration_s), 1)], starttime=starttime)
+    with pytest.warns(UserWarning, match="Creating [BE]DF\\+C to store microsecond"):
+        edf = Edf([EdfSignal(np.zeros(duration_s), 1)], starttime=starttime)
     edf.write(tmp_file)
     edf = read_edf(tmp_file)
     assert edf.starttime == starttime
