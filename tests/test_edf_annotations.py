@@ -53,7 +53,7 @@ MNE_TEST_ANNOTATIONS = (
         (0.00000000001, "+0.00000000001"),
         (100000000000.0, "+100000000000"),
         # onsets whose fixed-precision formatting would expose binary rounding
-        # noise once the integer part is large (see GitHub issue)
+        # noise once the integer part is large (see GitHub issue #109)
         (8191.202312, "+8191.202312"),
         (8192.202312, "+8192.202312"),
         (8193.202312, "+8193.202312"),
