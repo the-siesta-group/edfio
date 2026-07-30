@@ -52,6 +52,12 @@ MNE_TEST_ANNOTATIONS = (
         (0.00000001, "+0.00000001"),
         (0.00000000001, "+0.00000000001"),
         (100000000000.0, "+100000000000"),
+        # onsets whose fixed-precision formatting would expose binary rounding
+        # noise once the integer part is large (see GitHub issue #109)
+        (8191.202312, "+8191.202312"),
+        (8192.202312, "+8192.202312"),
+        (8193.202312, "+8193.202312"),
+        (29787.202312, "+29787.202312"),
         (-0.1, "-0.1"),
         (-0.0000001, "-0.0000001"),
         (-0.0000000001, "-0.0000000001"),
@@ -76,6 +82,7 @@ def test_encode_annotation_onset(onset: float, expected: str):
         (0.0000001, "0.0000001"),
         (0.00000000001, "0.00000000001"),
         (100000000000.0, "100000000000"),
+        (12345.6789, "12345.6789"),
     ],
 )
 def test_encode_annotation_duration(duration: float, expected: str):
@@ -85,6 +92,23 @@ def test_encode_annotation_duration(duration: float, expected: str):
 def test_encode_annotation_duration_raises_error_for_negative_values():
     with pytest.raises(ValueError, match="Annotation duration must be positive, is"):
         _encode_annotation_duration(-1)
+
+
+def test_long_recording_with_subsecond_starttime_roundtrip(tmp_file: Path):
+    # A sub-second starttime writes a timekeeping onset into every data record.
+    # For long recordings the later onsets have a large integer part, which used
+    # to expose binary rounding noise (e.g. 8192.202312 -> "+8192.202311999999"),
+    # corrupting the sub-second offset. Ensure the offset round-trips exactly.
+    duration_s = 8193
+    starttime = datetime.time(23, 20, 20, 202312)
+    with pytest.warns(UserWarning, match="Creating [BE]DF\\+C to store microsecond"):
+        edf = Edf([EdfSignal(np.zeros(duration_s), 1)], starttime=starttime)
+    edf.write(tmp_file)
+    edf = read_edf(tmp_file)
+    assert edf.starttime == starttime
+    signal = edf._signals[1]
+    last_data_record = signal.digital.reshape(-1, signal._bytes_per_data_record)[-1]
+    assert last_data_record.tobytes().startswith(b"+8192.202312")
 
 
 def test_edf_annotations():
