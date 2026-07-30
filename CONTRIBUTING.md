@@ -41,10 +41,6 @@ To run the tests, in the project or package root execute
 
     pytest
 
-Make sure all lines are covered by tests with
-
-    pytest --cov
-
 > [!NOTE]
 > Tests are automatically run for both EDF and BDF.
 > `conftest.py` defines the `inject_classes` fixture which replaces `read_edf`, `Edf`, and `EdfSignal` with their BDF counterparts and modifies a `_Context` class which provides the digital range, the number of bits per sample (`16`/`24`), and the format name (`"edf"`/`"bdf"`).
