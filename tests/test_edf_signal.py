@@ -480,3 +480,117 @@ def test_get_data_slice_with_no_data_available(lazy_loaded_signal: EdfSignal):
     lazy_loaded_signal._lazy_loader = None
     with pytest.raises(ValueError, match="Signal data not set"):
         lazy_loaded_signal.get_data_slice(0, 1)
+
+
+@pytest.mark.parametrize(
+    "digital",
+    [
+        pytest.param([-32768, 32767], marks=pytest.mark.edf),
+        pytest.param([-8388608, 8388607], marks=pytest.mark.bdf),
+    ],
+)
+def test_from_digital_without_digital_range(digital):
+    signal = EdfSignal.from_digital(
+        digital=np.array(digital, dtype=EdfSignal._digital_dtype),
+        sampling_frequency=1,
+        physical_range=(-500, 500),
+    )
+    assert signal.digital_range == EdfSignal._default_digital_range
+    np.testing.assert_equal(signal.data, [-500, 500])
+
+
+@pytest.mark.parametrize(
+    "digital_range",
+    [
+        [0, 10],
+        [-2048, 2047],
+        [-32768, 32767],
+        pytest.param([-65536, 65535], marks=pytest.mark.bdf),
+        pytest.param([-8388608, 8388607], marks=pytest.mark.bdf),
+    ],
+)
+def test_from_digital_with_digital_range(digital_range):
+    signal = EdfSignal.from_digital(
+        digital=np.array(digital_range, dtype=EdfSignal._digital_dtype),
+        sampling_frequency=1,
+        physical_range=(-500, 500),
+        digital_range=digital_range,
+    )
+    np.testing.assert_equal(signal.data, [-500, 500])
+
+
+def test_from_digital_without_physical_range_creates_uncalibrated_signal():
+    digital = [0, 5, 10]
+    signal = EdfSignal.from_digital(
+        np.array(digital, dtype=EdfSignal._digital_dtype),
+        sampling_frequency=1,
+    )
+    assert signal.physical_range == EdfSignal._default_digital_range
+    np.testing.assert_equal(signal._digital, digital)
+
+
+@pytest.mark.parametrize(
+    "digital_dtype",
+    [
+        pytest.param(np.int32, marks=pytest.mark.edf),
+        pytest.param(np.int16, marks=pytest.mark.bdf),
+        np.float32,
+        np.float64,
+    ],
+)
+def test_from_digital_invalid_dtype(digital_dtype):
+    with pytest.raises(ValueError, match="Digital data must be of dtype .*, got .*"):
+        EdfSignal.from_digital(np.array([-2048, 2047], dtype=digital_dtype), 1)
+
+
+@pytest.mark.parametrize(
+    "digital",
+    [
+        [-2048, 2047],
+        [-2047, 2048],
+        [-2048, 2048],
+    ],
+)
+def test_from_digital_signal_out_of_specified_range(digital):
+    with pytest.raises(ValueError, match="Signal range .* out of digital range"):
+        EdfSignal.from_digital(
+            digital=np.array(digital, dtype=EdfSignal._digital_dtype),
+            sampling_frequency=1,
+            digital_range=(-2047, 2047),
+        )
+
+
+@pytest.mark.parametrize(
+    "digital_range",
+    [
+        pytest.param([-32769, 32767], marks=pytest.mark.edf),
+        pytest.param([-32768, 32768], marks=pytest.mark.edf),
+        pytest.param([-8388609, 8388607], marks=pytest.mark.bdf),
+        pytest.param([-8388608, 8388608], marks=pytest.mark.bdf),
+    ],
+)
+def test_from_digital_invalid_limits(digital_range):
+    with pytest.raises(
+        ValueError, match="Digital range .* out of supported range .* for .*"
+    ):
+        EdfSignal.from_digital(
+            digital=np.array([-1, 1], dtype=EdfSignal._digital_dtype),
+            sampling_frequency=1,
+            digital_range=digital_range,
+        )
+
+
+@pytest.mark.parametrize(
+    "digital_range",
+    [
+        pytest.param([-32769, 32767], marks=pytest.mark.edf),
+        pytest.param([-32768, 32768], marks=pytest.mark.edf),
+        pytest.param([-8388609, 8388607], marks=pytest.mark.bdf),
+        pytest.param([-8388608, 8388608], marks=pytest.mark.bdf),
+    ],
+)
+def test_edf_signal_invalid_digital_range(digital_range):
+    with pytest.raises(
+        ValueError, match="Digital range .* out of supported range .* for .*"
+    ):
+        EdfSignal(np.array([-1, 1]), 1, digital_range=digital_range)
