@@ -22,19 +22,19 @@ _ANNOTATIONS_PATTERN = re.compile(
 
 
 def _encode_annotation_onset(onset: float) -> str:
-    string = f"{onset:+.12f}".rstrip("0")
-    if string[-1] == ".":
-        return string[:-1]
-    return string
+    # Use the shortest decimal string that round-trips to the same float, in
+    # positional (non-scientific) notation as required by EDF+. A fixed-precision
+    # format such as f"{onset:+.12f}" exposes binary rounding noise once the
+    # integer part is large (e.g. 8192.202312 -> "+8192.202311999999"), producing
+    # an onset that drifts from the intended sub-second offset and is rejected by
+    # strict EDF+ readers.
+    return np.format_float_positional(onset, unique=True, trim="-", sign=True)
 
 
 def _encode_annotation_duration(duration: float) -> str:
     if duration < 0:
         raise ValueError(f"Annotation duration must be positive, is {duration}")
-    string = f"{duration:.12f}".rstrip("0")
-    if string[-1] == ".":
-        return string[:-1]
-    return string
+    return np.format_float_positional(duration, unique=True, trim="-")
 
 
 class EdfAnnotation(NamedTuple):
@@ -80,7 +80,6 @@ def _create_annotations_signal(
     with_timestamps: bool = True,
     subsecond_offset: float = 0,
 ) -> _Signal:
-    bytes_per_sample = signal_class._bytes_per_sample
     data_record_starts = np.arange(num_data_records) * data_record_duration
     # list.pop() is O(1) and list.pop(0) is O(n), so using a reversed list is faster
     annotations = sorted(annotations, reverse=True)
@@ -102,6 +101,17 @@ def _create_annotations_signal(
                 )
             )
         data_records.append(_EdfAnnotationsDataRecord(tals).to_bytes())
+    return _data_records_to_annotations_signal(
+        data_records, signal_class, data_record_duration
+    )
+
+
+def _data_records_to_annotations_signal(
+    data_records: list[bytes],
+    signal_class: type[_Signal],
+    data_record_duration: float,
+) -> _Signal:
+    bytes_per_sample = signal_class._bytes_per_sample
     maxlen = max(len(data_record) for data_record in data_records)
     maxlen = math.ceil(maxlen / bytes_per_sample) * bytes_per_sample
     raw = b"".join(dr.ljust(maxlen, b"\x00") for dr in data_records)

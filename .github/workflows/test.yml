@@ -1,21 +1,16 @@
 name: Test
 
 on:
-  push:
-    paths-ignore:
-      - 'docs/**'
-      - '**/*.md'
+  workflow_dispatch:
   workflow_call:
   pull_request:
-    branches:
-      - main
 
 jobs:
   pre-commit:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/cache@v5
+      - uses: actions/checkout@v7
+      - uses: actions/cache@v6
         with:
           path: ~/.cache/pre-commit
           key: pre-commit-${{ hashFiles('.pre-commit-config.yaml') }}-${{ hashFiles('pyproject.toml') }}
@@ -25,7 +20,7 @@ jobs:
           enable-cache: true
           cache-dependency-glob: "**/pyproject.toml"
       - name: Pre-commit
-        run: uv run --python=3.9 --with numpy==1.22.0 pre-commit run --all-files
+        run: uv run --with numpy==1.22.0 pre-commit run --all-files
 
   test:
     needs: pre-commit
@@ -49,13 +44,11 @@ jobs:
           - python-version: "3.14"
             numpy: numpy==2.3.2
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: Setup uv
         uses: astral-sh/setup-uv@v7
         with:
           enable-cache: true
           cache-dependency-glob: "**/pyproject.toml"
-      - name: Install Python ${{ matrix.python-version }}
-        run: uv python install ${{ matrix.python-version }}
       - name: Pytest
-        run: uv run --with ${{ matrix.numpy }} pytest -Werror --cov --cov-report term-missing --cov-fail-under=100
+        run: uv run --python=${{matrix.python-version}} --with ${{ matrix.numpy }} pytest

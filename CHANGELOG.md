@@ -2,6 +2,24 @@
 
 ## Unreleased
 
+### Added
+- Add `EdfSignal.from_digital` and `BdfSignal.from_digital` to allow creating signals from digital data ([#96](https://github.com/the-siesta-group/edfio/pull/96))
+- Ensure the `digital_range` parameter of `EdfSignal`/`BdfSignal` is within the range supported by the format ([#96](https://github.com/the-siesta-group/edfio/pull/96))
+
+## [0.4.15] - 2026-07-30
+
+### Fixed
+- Encode annotation onsets and durations using the shortest round-trippable decimal, avoiding binary rounding noise that corrupted the sub-second start offset of long EDF+ recordings and made them unreadable by strict EDF+ readers ([#109](https://github.com/the-siesta-group/edfio/pull/109)).
+
+## [0.4.14] - 2026-07-15
+
+### Added
+- Allow getting the recording starttime when the very first EDF+ timekeeping annotation has an onset >=1 second ([#108](https://github.com/the-siesta-group/edfio/pull/108)).
+- Add a property `is_continuous` which returns False for EDF+ files where not all onsets of data records coincide with the ends of the preceding ones ([#108](https://github.com/the-siesta-group/edfio/pull/108)).
+
+### Fixed
+- Use `.reshape` instead of setting `.shape` which is deprecated in NumPy v2.5.0 ([#106](https://github.com/the-siesta-group/edfio/pull/106)).
+
 ## [0.4.13] - 2026-02-11
 
 ### Added

@@ -10,11 +10,14 @@ from edfio import (
     Edf,
     EdfAnnotation,
     EdfSignal,
+    Recording,
     read_edf,
 )
 from edfio.edf_annotations import (
     _create_annotations_signal,
+    _data_records_to_annotations_signal,
     _EdfAnnotationsDataRecord,
+    _EdfTAL,
     _encode_annotation_duration,
     _encode_annotation_onset,
 )
@@ -49,6 +52,12 @@ MNE_TEST_ANNOTATIONS = (
         (0.00000001, "+0.00000001"),
         (0.00000000001, "+0.00000000001"),
         (100000000000.0, "+100000000000"),
+        # onsets whose fixed-precision formatting would expose binary rounding
+        # noise once the integer part is large (see GitHub issue #109)
+        (8191.202312, "+8191.202312"),
+        (8192.202312, "+8192.202312"),
+        (8193.202312, "+8193.202312"),
+        (29787.202312, "+29787.202312"),
         (-0.1, "-0.1"),
         (-0.0000001, "-0.0000001"),
         (-0.0000000001, "-0.0000000001"),
@@ -73,6 +82,7 @@ def test_encode_annotation_onset(onset: float, expected: str):
         (0.0000001, "0.0000001"),
         (0.00000000001, "0.00000000001"),
         (100000000000.0, "100000000000"),
+        (12345.6789, "12345.6789"),
     ],
 )
 def test_encode_annotation_duration(duration: float, expected: str):
@@ -82,6 +92,23 @@ def test_encode_annotation_duration(duration: float, expected: str):
 def test_encode_annotation_duration_raises_error_for_negative_values():
     with pytest.raises(ValueError, match="Annotation duration must be positive, is"):
         _encode_annotation_duration(-1)
+
+
+def test_long_recording_with_subsecond_starttime_roundtrip(tmp_file: Path):
+    # A sub-second starttime writes a timekeeping onset into every data record.
+    # For long recordings the later onsets have a large integer part, which used
+    # to expose binary rounding noise (e.g. 8192.202312 -> "+8192.202311999999"),
+    # corrupting the sub-second offset. Ensure the offset round-trips exactly.
+    duration_s = 8193
+    starttime = datetime.time(23, 20, 20, 202312)
+    with pytest.warns(UserWarning, match="Creating [BE]DF\\+C to store microsecond"):
+        edf = Edf([EdfSignal(np.zeros(duration_s), 1)], starttime=starttime)
+    edf.write(tmp_file)
+    edf = read_edf(tmp_file)
+    assert edf.starttime == starttime
+    signal = edf._signals[1]
+    last_data_record = signal.digital.reshape(-1, signal._bytes_per_data_record)[-1]
+    assert last_data_record.tobytes().startswith(b"+8192.202312")
 
 
 def test_edf_annotations():
@@ -423,12 +450,22 @@ def test_high_numbers_of_annotations_are_possible(tmp_file: Path):
     assert len(read_edf(tmp_file).annotations) == fs
 
 
-def test_starttime_raises_helpful_error_for_invalid_timestamp_annotation():
+@pytest.mark.parametrize(
+    ("offset", "expected"),
+    [
+        (0, datetime.time(0, 0, 0)),
+        (1, datetime.time(0, 0, 1)),
+        (2.345, datetime.time(0, 0, 2, 345000)),
+        (2.345678, datetime.time(0, 0, 2, 345678)),
+        (2.3456789, datetime.time(0, 0, 2, 345679)),
+    ],
+)
+def test_starttime_with_subsecond_offset(offset: float, expected: datetime.time):
     edf = Edf(
         [
             EdfSignal(np.arange(1), 1),
             _create_annotations_signal(
-                [EdfAnnotation(2.345, None, "")],
+                [EdfAnnotation(offset, None, "")],
                 signal_class=EdfSignal,
                 num_data_records=1,
                 data_record_duration=1,
@@ -437,8 +474,26 @@ def test_starttime_raises_helpful_error_for_invalid_timestamp_annotation():
         ]
     )
     edf._reserved = f"{edf._fmt}+C".ljust(44).encode()
-    with pytest.raises(ValueError, match="Subsecond offset in first annotation must"):
-        edf.starttime
+    assert edf.starttime == expected
+
+
+def test_startdate_where_subsecond_offsets_shifts_past_midnight():
+    edf = Edf(
+        [
+            EdfSignal(np.arange(1), 1),
+            _create_annotations_signal(
+                [EdfAnnotation(10, None, "")],
+                signal_class=EdfSignal,
+                num_data_records=1,
+                data_record_duration=1,
+                with_timestamps=False,
+            ),
+        ],
+        recording=Recording(startdate=datetime.date(2026, 7, 14)),
+        starttime=datetime.time(23, 59, 55),
+    )
+    assert edf.starttime == datetime.time(0, 0, 5)
+    assert edf.startdate == datetime.date(2026, 7, 15)
 
 
 def test_edf_anonymized_does_not_remove_annotations():
@@ -538,3 +593,39 @@ def test_mixture_of_annotations_with_and_without_durations():
         EdfAnnotation(0.2, 0.5, "B"),
         EdfAnnotation(0.7, None, "C"),
     )
+
+
+def test_edf_without_annotations_is_continuous():
+    edf = Edf([EdfSignal(np.arange(4), 1)])
+    assert edf.is_continuous is True
+
+
+@pytest.mark.parametrize(
+    ("onsets", "data_record_duration", "expected"),
+    [
+        ((0, 1, 2, 3), 1, True),
+        ((2, 3, 4, 5), 1, True),
+        ((0, 1, 3, 4), 1, False),
+        ((0, 2, 4, 6), 2, True),
+        ((3, 5, 7, 9), 2, True),
+        ((0, 2, 5, 7), 2, False),
+        ((0.0, 0.1, 0.2, 0.3), 0.1, True),
+        ((0.1, 0.2, 0.3, 0.4), 0.1, True),
+        ((0.1, 0.2, 0.4, 0.5), 0.1, False),
+    ],
+)
+def test_is_continuous(onsets, expected, data_record_duration):
+    annotations_signal = _data_records_to_annotations_signal(
+        [_EdfAnnotationsDataRecord([_EdfTAL(o, None, [])]).to_bytes() for o in onsets],
+        EdfSignal,
+        data_record_duration,
+    )
+
+    edf = Edf(
+        [
+            EdfSignal(np.arange(len(onsets)), 1 / data_record_duration),
+            annotations_signal,
+        ],
+        data_record_duration=data_record_duration,
+    )
+    assert edf.is_continuous == expected
