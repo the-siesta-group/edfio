@@ -358,6 +358,24 @@ def test_edf_startdate_falls_back_to_legacy_field_if_recording_field_is_not_vali
     assert edf.startdate == startdate
 
 
+def test_edf_startdatetime():
+    edf = Edf(
+        [EdfSignal(np.arange(10), 1)],
+        recording=Recording(startdate=datetime.date(2023, 4, 25)),
+        starttime=datetime.time(12, 34, 56),
+    )
+    assert edf.startdatetime == datetime.datetime(2023, 4, 25, 12, 34, 56)
+
+
+def test_edf_enddatetime():
+    edf = Edf(
+        [EdfSignal(np.arange(10), 1)],
+        recording=Recording(startdate=datetime.date(2023, 12, 31)),
+        starttime=datetime.time(23, 59, 55),
+    )
+    assert edf.enddatetime == datetime.datetime(2024, 1, 1, 0, 0, 5)
+
+
 @pytest.mark.parametrize(
     ("code", "name", "additional"),
     [

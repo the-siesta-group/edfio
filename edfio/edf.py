@@ -600,6 +600,25 @@ class _Base(Generic[_Signal]):
                 )
                 annotation_signal._digital = np.frombuffer(raw, dtype=np.uint8)  # type: ignore[assignment]
 
+    @property
+    def startdatetime(self) -> datetime.datetime:
+        """
+        Recording start datetime.
+
+        Combines :attr:`startdate` and :attr:`starttime` into a single
+        :class:`datetime.datetime`.
+        """
+        return datetime.datetime.combine(self.startdate, self.starttime)
+
+    @property
+    def enddatetime(self) -> datetime.datetime:
+        """
+        Recording end datetime.
+
+        :attr:`duration` seconds after :attr:`startdatetime`.
+        """
+        return self.startdatetime + datetime.timedelta(seconds=self.duration)
+
     def _set_startdate_with_recording(self, recording: Recording) -> None:
         try:
             startdate = recording.startdate

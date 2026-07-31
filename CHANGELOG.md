@@ -6,6 +6,7 @@
 - Add `EdfSignal.from_digital` and `BdfSignal.from_digital` to allow creating signals from digital data ([#96](https://github.com/the-siesta-group/edfio/pull/96))
 - Ensure the `digital_range` parameter of `EdfSignal`/`BdfSignal` is within the range supported by the format ([#96](https://github.com/the-siesta-group/edfio/pull/96))
 - Allow lazy loading of EDF files from bytes object ([#103](https://github.com/the-siesta-group/edfio/pull/103))
+- Add properties `Edf.startdatetime` and `Edf.enddatetime` ([#112](https://github.com/the-siesta-group/edfio/pull/112))
 
 ## [0.4.15] - 2026-07-30
 
