@@ -102,6 +102,7 @@ convention = "numpy"
 
 [tool.pytest.ini_options]
 markers = ["edf: mark test as EDF specific", "bdf: mark test as BDF specific"]
+addopts = "-Werror --cov --cov-report term-missing --cov-fail-under=100"
 
 [tool.coverage.run]
 source_dirs = ["edfio", "tests"]

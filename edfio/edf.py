@@ -51,6 +51,28 @@ else:  # pragma: no cover
 _Signal = TypeVar("_Signal", bound=Union[EdfSignal, BdfSignal])
 
 
+def _calc_age_in_years(birthdate: datetime.date, reference_date: datetime.date) -> int:
+    """Calculate age in years at a reference date.
+
+    Parameters
+    ----------
+    birthdate : datetime.date
+        The date of birth.
+    reference_date : datetime.date
+        The date at which to calculate the age.
+
+    Returns
+    -------
+    int
+        The age in years.
+    """
+    age = reference_date.year - birthdate.year
+    # adjust if birthday hasn't occurred yet in the reference year
+    if (reference_date.month, reference_date.day) < (birthdate.month, birthdate.day):
+        age -= 1
+    return age
+
+
 class _Base(Generic[_Signal]):
     _header_fields = (
         ("version", 8),
@@ -216,7 +238,7 @@ class _Base(Generic[_Signal]):
             )
             # 24th bit determines the sign
             datarecords[datarecords >= (1 << 23)] -= 1 << 24
-            datarecords.shape = (actual_records, datarecord_len)
+            datarecords = datarecords.reshape(actual_records, datarecord_len)
         elif not isinstance(file, Path):
             data_bytes = file.read()
             actual_records = len(data_bytes) // (datarecord_len * 2)
@@ -225,7 +247,7 @@ class _Base(Generic[_Signal]):
             datarecords = np.frombuffer(
                 data_bytes, dtype=np.int16, count=actual_records * datarecord_len
             )
-            datarecords.shape = (actual_records, datarecord_len)
+            datarecords = datarecords.reshape(actual_records, datarecord_len)
         else:
             remaining_bytes = file.stat().st_size - self.bytes_in_header_record
             actual_records = remaining_bytes // (datarecord_len * 2)
@@ -501,11 +523,17 @@ class _Base(Generic[_Signal]):
                     f"Different values in startdate fields: {legacy_startdate}, {self.recording.startdate}"
                 )
         try:
-            return self.recording.startdate
+            startdate = self.recording.startdate
         except AnonymizedDateError:
             raise
         except ValueError:
-            return legacy_startdate
+            startdate = legacy_startdate
+        if subsecond_offset := self._subsecond_offset:
+            return (
+                datetime.datetime.combine(startdate, decode_time(self._starttime))
+                + datetime.timedelta(seconds=subsecond_offset)
+            ).date()
+        return startdate
 
     @startdate.setter
     def startdate(self, startdate: datetime.date) -> None:
@@ -536,15 +564,11 @@ class _Base(Generic[_Signal]):
 
         In EDF+ files, microsecond accuracy is supported.
         """
+        starttime = decode_time(self._starttime)
         subsecond_offset = self._subsecond_offset
-        try:
-            return decode_time(self._starttime).replace(
-                microsecond=round(subsecond_offset * 1000000)
-            )
-        except ValueError as e:
-            raise ValueError(
-                f"Subsecond offset in first annotation must be 0.X, is {subsecond_offset}"
-            ) from e
+        dummy_datetime = datetime.datetime.combine(datetime.date(1, 1, 1), starttime)
+        dummy_datetime += datetime.timedelta(seconds=subsecond_offset)
+        return dummy_datetime.time()
 
     @starttime.setter
     def starttime(self, starttime: datetime.time) -> None:
@@ -717,11 +741,17 @@ class _Base(Generic[_Signal]):
             elif diff < 0:
                 signal._set_data(signal.data[:diff])
 
-    def anonymize(self) -> None:
+    def anonymize(
+        self,
+        *,
+        keep_age: bool = False,
+        keep_sex: bool = False,
+        keep_starttime: bool = False,
+    ) -> None:
         """
         Anonymize a recording.
 
-        Header fields are modified as follows:
+        By default, header fields are modified as follows:
           - local patient identification is set to `X X X X`
           - local recording identification is set to `Startdate X X X X`
           - startdate is set to `01.01.85`
@@ -729,10 +759,41 @@ class _Base(Generic[_Signal]):
 
         For EDF+ files, subsecond starttimes specified via an annotations signal are
         removed.
+
+        Optionally, parts of the original information can be preserved by setting the
+        corresponding parameters to True (see below).
+
+        Parameters
+        ----------
+        keep_age : bool, default: False
+            Whether to keep age information relative to the anonymized start date in the
+            local patient identification. If True, the birthdate is set to January 1st
+            of the year that preserves the age relative to `01.01.85`. This implies that
+            the local patient identification is set to `X X 01-JAN-YYYY X`, where `YYYY`
+            is the age-preserving year.
+        keep_sex : bool, default: False
+            Whether to keep the sex field in the local patient identification.
+        keep_starttime : bool, default: False
+            Whether to keep the original start time.
         """
-        self.patient = Patient()
-        self.recording = Recording()
-        self.starttime = datetime.time(0, 0, 0)
+        if keep_age:
+            try:
+                birthdate = self.patient.birthdate
+            except AnonymizedDateError:  # already anonymized
+                birthdate = None
+            else:
+                age = _calc_age_in_years(birthdate, self.startdate)  # type: ignore[arg-type]
+                birthdate = datetime.date(1985 - age, 1, 1)
+        else:
+            birthdate = None
+
+        startdate = datetime.date(1985, 1, 1) if keep_age else None
+        sex = self.patient.sex if keep_sex else "X"
+        starttime = self.starttime if keep_starttime else datetime.time(0, 0, 0)
+
+        self.patient = Patient(sex=sex, birthdate=birthdate)  # type: ignore[arg-type]
+        self.recording = Recording(startdate=startdate)
+        self.starttime = starttime
 
     def drop_signals(self, drop: Iterable[int | str]) -> None:
         """
@@ -803,6 +864,39 @@ class _Base(Generic[_Signal]):
     @property
     def _timekeeping_signal(self) -> _Signal:
         return next(iter(self._annotation_signals))
+
+    @property
+    def is_continuous(self) -> bool:
+        """
+        Whether the recording is continuous, based on EDF+ timekeeping annotations.
+
+        According to the EDF+ specification, a recording is continuous if the starttime
+        of each data record coincides with the end (starttime + duration) of the
+        preceding one.
+
+        Returns
+        -------
+        bool
+            True if the recording is continuous, False otherwise.
+        """
+        try:
+            timekeeping_signal = self._timekeeping_signal
+        except StopIteration:
+            return True
+        prev_onset = self._subsecond_offset
+        data_record_duration = self.data_record_duration
+        for data_record in timekeeping_signal.digital.reshape(
+            (-1, timekeeping_signal._bytes_per_data_record)
+        )[1:]:
+            onset = (
+                _EdfAnnotationsDataRecord.from_bytes(data_record.tobytes())
+                .tals[0]
+                .onset
+            )
+            if onset != round(prev_onset + data_record_duration, 12):
+                return False
+            prev_onset = onset
+        return True
 
     @property
     def duration(self) -> float:

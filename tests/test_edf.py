@@ -22,7 +22,7 @@ from edfio import (
     Recording,
     read_edf,
 )
-from edfio.edf import _calculate_num_data_records
+from edfio.edf import _calc_age_in_years, _calculate_num_data_records
 from edfio.edf_annotations import _create_annotations_signal
 from edfio.edf_signal import _FloatRange
 from tests import TEST_DATA_DIR
@@ -30,6 +30,7 @@ from tests.conftest import _Context
 
 EDF_FILE = TEST_DATA_DIR / "short_psg.edf"
 EDF_SIGNAL_REFERENCE_FILE = TEST_DATA_DIR / "short_psg_header_reference.json"
+SUBSECOND_TEST_FILE = TEST_DATA_DIR / "test_subsecond.edf"
 
 
 # no idea why, but doing this here once works, but adding it to pytest.ini_options in
@@ -368,7 +369,22 @@ def test_edf_signal_requiring_rounding_in_physical_max_is_written_and_read_corre
     np.testing.assert_equal(loaded_signal.data, signal.data)
 
 
-def test_edf_anonymized(tmp_file: Path):
+@pytest.mark.parametrize(
+    ("birthdate", "reference_date", "expected_age"),
+    [
+        (datetime.date(1990, 5, 15), datetime.date(2020, 10, 20), 30),
+        (datetime.date(1990, 5, 15), datetime.date(2020, 3, 10), 29),
+    ],
+)
+def test_calc_age_in_years(
+    birthdate: datetime.date,
+    reference_date: datetime.date,
+    expected_age: int,
+):
+    assert _calc_age_in_years(birthdate, reference_date) == expected_age
+
+
+def test_edf_anonymized_default(tmp_file: Path):
     edf = read_edf(EDF_FILE)
     edf_anon = edf.copy()
     edf_anon.anonymize()
@@ -390,6 +406,89 @@ def test_edf_anonymized(tmp_file: Path):
         b"16.13.00",
         b"00.00.00",
     )
+
+
+@pytest.mark.parametrize(
+    ("keep_age", "keep_sex", "keep_starttime"),
+    [
+        (False, True, False),
+        (True, False, False),
+        (False, False, True),
+        (True, True, False),
+        (False, True, True),
+        (True, False, True),
+        (True, True, True),
+    ],
+)
+def test_edf_anonymized_keep_flags(
+    *,
+    keep_age: bool,
+    keep_sex: bool,
+    keep_starttime: bool,
+):
+    edf = read_edf(SUBSECOND_TEST_FILE)  # this file has a birthdate
+    original_age = _calc_age_in_years(edf.patient.birthdate, edf.recording.startdate)
+    original_sex = edf.patient.sex
+    original_starttime = edf.starttime
+
+    edf_anon = edf.copy()
+    edf_anon.anonymize(
+        keep_age=keep_age, keep_sex=keep_sex, keep_starttime=keep_starttime
+    )
+
+    # check that original is unchanged
+    assert edf.local_patient_identification == "X F 20-JAN-1998 X,X"
+    assert edf.local_recording_identification == "Startdate 24-JAN-2020 X X X"
+
+    # check that identifying information is always anonymized
+    assert edf_anon.patient.code == "X"
+    assert edf_anon.patient.name == "X"
+    if keep_age:  # literal "01-JAN-1985" in the header field
+        assert edf_anon.recording.startdate == datetime.date(1985, 1, 1)
+    else:  # "X" in the header field (which is interpreted as 01-JAN-1985 internally)
+        with pytest.raises(AnonymizedDateError):
+            edf_anon.recording.startdate
+    assert edf_anon.recording.hospital_administration_code == "X"
+    assert edf_anon.recording.investigator_technician_code == "X"
+    assert edf_anon.recording.equipment_code == "X"
+
+    # check what was preserved
+    if keep_sex:
+        assert edf_anon.patient.sex == original_sex
+    else:
+        assert edf_anon.patient.sex == "X"
+
+    if keep_starttime:
+        assert edf_anon.starttime == original_starttime
+    else:
+        assert edf_anon.starttime == datetime.time(0, 0, 0)
+
+    if keep_age:
+        assert edf_anon.patient.birthdate.month == 1
+        assert edf_anon.patient.birthdate.day == 1
+        anonymized_age = _calc_age_in_years(
+            edf_anon.patient.birthdate, edf_anon.recording.startdate
+        )
+        assert anonymized_age == original_age
+
+
+def test_edf_anonymize_already_anonymized():
+    edf = read_edf(SUBSECOND_TEST_FILE)  # this file has a birthdate
+    # first anonymize without keeping age (birthdate becomes "X")
+    edf.anonymize()
+
+    # verify birthdate is anonymized
+    with pytest.raises(AnonymizedDateError):
+        edf.patient.birthdate
+
+    # now anonymize again with keep_age=True
+    edf.anonymize(keep_age=True)
+
+    # birthdate should still be anonymized (None)
+    with pytest.raises(AnonymizedDateError):
+        edf.patient.birthdate
+
+    assert edf.recording.startdate == datetime.date(1985, 1, 1)
 
 
 def test_read_edf_str():
