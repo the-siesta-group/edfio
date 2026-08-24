@@ -325,6 +325,27 @@ class _BaseSignal(Generic[_DigitalDtype]):
         return int(decode_str(self._digital_max))
 
     @property
+    def gain(self) -> float:
+        """Scaling factor applied to digital samples, e.g., `0.09765625`.
+
+        Multiplying digital samples by `gain` after adding `offset` yields the
+        physical signal: `(digital + offset) * gain`. Useful for decoding
+        slices (see `get_digital_slice`) without materializing the full signal.
+        """
+        gain, offset = _calculate_gain_and_offset(
+            self.digital_min, self.digital_max, self.physical_min, self.physical_max,
+        )
+        return gain
+
+    @property
+    def offset(self) -> float:
+        """Offset added to digital samples before scaling by `gain`."""
+        gain, offset = _calculate_gain_and_offset(
+            self.digital_min, self.digital_max, self.physical_min, self.physical_max,
+        )
+        return offset
+
+    @property
     def prefiltering(self) -> str:
         """Signal prefiltering, e.g., `"HP:0.1Hz LP:75Hz"`."""
         return decode_str(self._prefiltering, self._header_encoding)

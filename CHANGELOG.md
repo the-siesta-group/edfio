@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+### Added
+- Add `EdfSignal.gain`/`offset` and `BdfSignal.gain`/`offset` properties exposing the scaling factors needed to decode digital slices (e.g., via `get_digital_slice`) without touching private helpers.
+
 ## [0.4.16] - 2026-07-31
 
 ### Added
