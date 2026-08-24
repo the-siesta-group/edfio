@@ -604,5 +604,7 @@ def test_gain_offset_properties():
     )
     digital = signal.digital
     np.testing.assert_allclose(
-        (digital + signal.offset) * signal.gain, signal.data, rtol=1e-12,
+        (digital + signal.offset) * signal.gain,
+        signal.data,
+        rtol=1e-12,
     )
