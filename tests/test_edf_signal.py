@@ -594,3 +594,17 @@ def test_edf_signal_invalid_digital_range(digital_range):
         ValueError, match="Digital range .* out of supported range .* for .*"
     ):
         EdfSignal(np.array([-1, 1]), 1, digital_range=digital_range)
+
+
+def test_gain_offset_properties():
+    signal = EdfSignal(
+        data=np.zeros(100),
+        sampling_frequency=256,
+        physical_range=(-200.0, 200.0),
+    )
+    digital = signal.digital
+    np.testing.assert_allclose(
+        (digital + signal.offset) * signal.gain,
+        signal.data,
+        rtol=1e-12,
+    )
