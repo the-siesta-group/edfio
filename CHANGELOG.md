@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## [0.4.17] - 2026-09-21
+
 ### Fixed
 - Always use four digits for the birthdate year in the local patient identification header ([#118](https://github.com/the-siesta-group/edfio/pull/118))
 
