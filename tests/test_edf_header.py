@@ -458,3 +458,17 @@ def test_read_recording_some_subfields_missing():
     assert recording.equipment_code == "X"
     assert recording.additional == ()
     assert recording.startdate == datetime.date(2025, 5, 13)
+
+
+@pytest.mark.parametrize(
+    ("year", "expected"),
+    [
+        (1, "01-JAN-0001"),
+        (10, "01-JAN-0010"),
+        (100, "01-JAN-0100"),
+        (999, "01-JAN-0999"),
+    ],
+)
+def test_birthdate_before_year_1000_is_encoded_correctly(year, expected):
+    patient = Patient(birthdate=datetime.datetime(year, 1, 1))
+    assert patient._local_patient_identification.split()[2] == expected

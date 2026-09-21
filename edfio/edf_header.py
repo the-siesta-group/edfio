@@ -41,7 +41,7 @@ def _decode_edfplus_date(date: str) -> datetime.date:
 
 
 def _encode_edfplus_date(date: datetime.date) -> str:
-    return f"{date.day:02}-{_MONTH_NAMES[date.month - 1]}-{date.year:02}"
+    return f"{date.day:02}-{_MONTH_NAMES[date.month - 1]}-{date.year:04}"
 
 
 def _validate_subfields(subfields: dict[str, str]) -> None:
