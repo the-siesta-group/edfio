@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import decimal
 import math
 import re
 from collections.abc import Iterable
@@ -7,6 +8,7 @@ from dataclasses import dataclass
 from typing import Any, NamedTuple, TypeVar, Union
 
 import numpy as np
+import numpy.typing as npt
 
 from edfio.edf_signal import BdfSignal, EdfSignal
 
@@ -177,3 +179,11 @@ class _EdfAnnotationsDataRecord:
             while text in tal.texts:
                 tal.texts.remove(text)
         self.tals = [tal for tal in self.tals if tal.texts]
+
+
+def _get_data_record_onset(data_record: npt.NDArray[np.uint8]) -> decimal.Decimal:
+    raw = data_record.tobytes()
+    matches = _ANNOTATIONS_PATTERN.findall(raw.decode())
+    if not matches:
+        raise ValueError(f"No valid annotations found in {raw!r}")
+    return decimal.Decimal(matches[0][0])
