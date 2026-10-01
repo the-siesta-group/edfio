@@ -629,3 +629,22 @@ def test_is_continuous(onsets, expected, data_record_duration):
         data_record_duration=data_record_duration,
     )
     assert edf.is_continuous == expected
+
+
+def test_is_continuous_avoids_floating_point_issues():
+    # When working with floats, 4095.123456 + 1 returns 4096.123455999999. Comparing
+    # data record onsets with the previous onset plus the data record duration should
+    # avoid such precision issues.
+    edf = Edf(
+        [EdfSignal(np.arange(4097), 1)],
+        starttime=datetime.time(0, 0, 0, 123456),
+        annotations=(),
+    )
+    assert edf.is_continuous
+
+
+def test_is_continuous_with_invalid_annotations_raises_error():
+    edf = Edf([EdfSignal(np.arange(10), 1)], annotations=())
+    edf._signals[-1]._digital[:] = 0
+    with pytest.raises(ValueError, match="No valid annotations"):
+        edf.is_continuous

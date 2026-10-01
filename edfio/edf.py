@@ -33,6 +33,7 @@ from edfio.edf_annotations import (
     EdfAnnotation,
     _create_annotations_signal,
     _EdfAnnotationsDataRecord,
+    _get_data_record_onset,
 )
 from edfio.edf_header import (
     AnonymizedDateError,
@@ -906,17 +907,15 @@ class _Base(Generic[_Signal]):
             timekeeping_signal = self._timekeeping_signal
         except StopIteration:
             return True
-        prev_onset = self._subsecond_offset
-        data_record_duration = self.data_record_duration
-        for data_record in timekeeping_signal.digital.reshape(
+
+        data_record_duration = Decimal(self._data_record_duration.decode())
+        data_records = timekeeping_signal.digital.reshape(
             (-1, timekeeping_signal._bytes_per_data_record)
-        )[1:]:
-            onset = (
-                _EdfAnnotationsDataRecord.from_bytes(data_record.tobytes())
-                .tals[0]
-                .onset
-            )
-            if onset != round(prev_onset + data_record_duration, 12):
+        )
+        prev_onset = _get_data_record_onset(data_records[0])
+        for data_record in data_records[1:]:
+            onset = _get_data_record_onset(data_record)
+            if onset != prev_onset + data_record_duration:
                 return False
             prev_onset = onset
         return True
