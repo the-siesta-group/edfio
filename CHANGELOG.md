@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## [0.4.18] - 2026-10-01
+
 ### Fixed
 - Avoid float precision issues in `Edf.is_continuous` by using `decimal.Decimal` ([#119](https://github.com/the-siesta-group/edfio/pull/119))
 
