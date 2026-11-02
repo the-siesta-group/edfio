@@ -496,6 +496,44 @@ def test_startdate_where_subsecond_offsets_shifts_past_midnight():
     assert edf.startdate == datetime.date(2026, 7, 15)
 
 
+@pytest.mark.parametrize(
+    "corrupted_first_tal",
+    [
+        b"junk",  # onset that cannot be parsed
+        b"\x00",  # missing onset, i.e., no TALs in the first data record
+    ],
+    ids=["invalid_onset", "missing_onset"],
+)
+def test_starttime_falls_back_to_legacy_field_when_timekeeping_onset_is_invalid(
+    corrupted_first_tal: bytes,
+):
+    edf = Edf(
+        signals=[EdfSignal(np.arange(1), 1)],
+        recording=Recording(startdate=datetime.date(2026, 7, 14)),
+        starttime=datetime.time(23, 59, 55),
+        annotations=(),
+    )
+    edf._timekeeping_signal.digital[: len(corrupted_first_tal)] = np.frombuffer(
+        corrupted_first_tal, dtype=np.uint8
+    )
+    assert edf.starttime == datetime.time(23, 59, 55)
+    assert edf.startdate == datetime.date(2026, 7, 14)
+    assert edf.startdatetime == datetime.datetime(2026, 7, 14, 23, 59, 55)
+
+
+def test_startdate_falls_back_to_legacy_field_when_edfplus_fields_are_invalid():
+    edf = Edf(
+        signals=[EdfSignal(np.arange(1), 1)],
+        recording=Recording(startdate=datetime.date(2026, 7, 14)),
+        starttime=datetime.time(23, 59, 55),
+        annotations=(),
+    )
+    edf._startdate = b"15.06.20"
+    edf.local_recording_identification = "Startdate 14-FOO-2026 X X X"
+    edf._timekeeping_signal.digital[:4] = np.frombuffer(b"junk", dtype=np.uint8)
+    assert edf.startdate == datetime.date(2020, 6, 15)
+
+
 def test_edf_anonymized_does_not_remove_annotations():
     edf = read_edf(MNE_TEST_FILE)
     edf.anonymize()

@@ -559,7 +559,7 @@ class _Base(Generic[_Signal]):
             timekeeping_raw = self._timekeeping_signal.digital.tobytes()
             first_data_record = timekeeping_raw[: timekeeping_raw.find(b"\x00") + 1]
             return _EdfAnnotationsDataRecord.from_bytes(first_data_record).tals[0].onset
-        except StopIteration:
+        except (IndexError, StopIteration, ValueError):
             return 0
 
     @property
