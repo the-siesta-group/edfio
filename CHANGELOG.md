@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+### Fixed
+- Fall back to the legacy header fields for `Edf.startdate`, `Edf.starttime` and `Edf.startdatetime` when the EDF+ sub-second start offset cannot be read ([#120](https://github.com/the-siesta-group/edfio/pull/120))
+
 ## [0.4.18] - 2026-10-01
 
 ### Fixed
